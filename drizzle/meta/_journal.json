@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1742663326173,
+      "tag": "0000_goofy_captain_universe",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1742664753661,
+      "tag": "0001_faithful_whiplash",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1742713081999,
+      "tag": "0002_huge_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1742721624486,
+      "tag": "0003_cloudy_justice",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1742723395275,
+      "tag": "0004_rare_justin_hammer",
+      "breakpoints": true
+    }
+  ]
+}
