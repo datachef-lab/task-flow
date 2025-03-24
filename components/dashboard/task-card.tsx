@@ -12,14 +12,21 @@ import { Task, User } from "@/db/schema";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DeleteTaskAlert } from "./delete-task-alert";
 
 type TaskCardProps = {
   task: Task;
   index: number;
   onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
+  onDeleteClick: () => void;
 };
 
-export default function TaskCard({ task, index, onSubmit }: TaskCardProps) {
+export default function TaskCard({
+  task,
+  index,
+  onSubmit,
+  onDeleteClick,
+}: TaskCardProps) {
   const [assignedUser, setAssignedUser] = useState<User | null>(null);
   const router = useRouter();
 
@@ -27,7 +34,7 @@ export default function TaskCard({ task, index, onSubmit }: TaskCardProps) {
     const fetchAssignedUser = async () => {
       const response = await fetch(`/api/users/${task.assignedUserId}`);
       const data = await response.json();
-      console.log("users:", data)
+      console.log("users:", data);
       setAssignedUser(data);
     };
 
@@ -56,29 +63,13 @@ export default function TaskCard({ task, index, onSubmit }: TaskCardProps) {
       toast.success("Task updated successfully");
     } catch (error) {
       toast.error("Failed to update task");
+    } finally {
+      router.refresh(); // Refresh the page to update stats
     }
   };
 
-  const deleteTask = async () => {
-    try {
-      const isConfirmed = confirm(
-        `Are you sure you want to delete task ${task.abbreviation}?`
-      );
-
-      if (!isConfirmed) return;
-
-      const res = await fetch(`/api/tasks/${task.id}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) throw new Error("Failed to delete task");
-
-      // Update parent state by removing the task
-      await onSubmit("edit", task);
-      toast.success("Task deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete task");
-    }
+  const handleDeleteTask = async () => {
+    await onDeleteClick();
   };
 
   const getPriorityColor = (priority: string) => {
@@ -120,6 +111,9 @@ export default function TaskCard({ task, index, onSubmit }: TaskCardProps) {
                 >
                   {task.description}
                 </h3>
+                <p className="text-muted-foreground text-xs mb-3">
+                  {task.abbreviation}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   Assigned to {assignedUser?.name}
                 </p>
@@ -135,6 +129,15 @@ export default function TaskCard({ task, index, onSubmit }: TaskCardProps) {
                 {task.priorityType}
               </Badge>
               <TaskButton type="edit" task={task} onSubmit={onSubmit} />
+              <DeleteTaskAlert onConfirm={handleDeleteTask} task={task}  />
+              {/* <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDeleteTask}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash className="h-4 w-4" />
+              </Button> */}
             </div>
           </div>
         </CardHeader>

@@ -39,6 +39,7 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
+        const id = await params.id;
         const task = await deleteTask(parseInt(params.id));
         return NextResponse.json(task);
     } catch (error) {

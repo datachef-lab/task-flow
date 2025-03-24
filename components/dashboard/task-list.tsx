@@ -5,18 +5,26 @@ import { Task, User } from "@/db/schema";
 import TaskCard from "./task-card";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { DeleteTaskAlert } from "./delete-task-alert";
 
 interface TaskListProps {
   allTasks: Task[];
-  filter?: "pending" | "completed" | "overdue";
+  filter?: "all" | "pending" | "completed" | "overdue";
   users: User[];
   onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
+  onTaskDelete: (taskId: number) => Promise<void>;
 }
 
-export function TaskList({ filter, users, allTasks, onSubmit }: TaskListProps) {
+export function TaskList({
+  filter,
+  users,
+  allTasks,
+  onSubmit,
+  onTaskDelete,
+}: TaskListProps) {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(allTasks);
-  const [isLoading, setIsLoading] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   useEffect(() => {
     setTasks(allTasks);
@@ -35,47 +43,44 @@ export function TaskList({ filter, users, allTasks, onSubmit }: TaskListProps) {
 
       if (!isConfirmed) return;
 
-      // Optimistic update
-      const updatedTask = { ...task, completed: !task.completed };
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
-
       // API call
+      const updatedTask = { ...task, completed: !task.completed };
       await onSubmit("edit", updatedTask);
+
+      // Optimistic update
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
       toast.success("Task updated successfully");
+      router.refresh();
     } catch (error) {
       // Rollback optimistic update
-    //   setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+      //   setTasks((prev) => prev.map((t) => (t.id === taskId ? task : t)));
       toast.error("Failed to update task");
     }
   };
 
-  const deleteTask = async (taskId: number) => {
+  const handleDeleteClick = (task: Task) => {
+    setTaskToDelete(task);
+  };
+
+  const handleDeleteConfirm = async (task: Task) => {
     try {
-      const task = tasks.find((t) => t.id === taskId);
-      if (!task) return;
-
-      const isConfirmed = confirm(
-        `Are you sure you want to delete task ${task.abbreviation}?`
-      );
-
-      if (!isConfirmed) return;
-
       // Optimistic update
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setTasks((prevTasks) => prevTasks.filter((t) => t.id !== task.id));
 
       // API call
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) throw new Error("Failed to delete task");
-
+      await onTaskDelete(task.id);
       toast.success("Task deleted successfully");
+      setTaskToDelete(null);
+      router.refresh();
     } catch (error) {
-      // Rollback optimistic update
-      setTasks(allTasks);
+      // Rollback on error
+      setTasks((prevTasks) => [...prevTasks, task]);
       toast.error("Failed to delete task");
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setTaskToDelete(null);
   };
 
   const handleSubmit = async (
@@ -139,6 +144,7 @@ export function TaskList({ filter, users, allTasks, onSubmit }: TaskListProps) {
             key={task.id}
             task={task}
             onSubmit={onSubmit}
+            onDeleteClick={() => handleDeleteConfirm(task)}
           />
         ))
       )}

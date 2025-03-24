@@ -3,10 +3,13 @@
 import { and, count, desc, eq, gt, gte, lt } from "drizzle-orm";
 import { db } from "../../db";
 import { sql } from 'drizzle-orm';
-import { Task, taskModel } from "../../db/schema";
+import { activityLogModel, Task, taskModel } from "../../db/schema";
 import { createActivityLog } from "./activity-service";
 import { getUserById } from "./user-service";
 import { sendEmail } from "../nodemailer";
+
+const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
+const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
 
 export async function getAllTasks(page: number = 1, size: number = 100) {
     const offset = (page - 1) * size;
@@ -174,17 +177,23 @@ export async function createTask(task: Task) {
         userId: createdTask.createdUserId
     });
 
-    // TODO: Send the email
-    const user = await getUserById(createdTask.assignedUserId as number);
-
     // Send the email
+    const createdUser = await getUserById(createdTask.createdUserId as number);
+    const assignedUser = await getUserById(createdTask.assignedUserId as number);
+
     await sendEmail(
-        user?.email as string,
+        assignedUser?.email as string,
         'Task Assignment',
         `Task "${data.abbreviation}" has been assigned to you.`
     );
 
     // TODO: Send the WhatsApp
+    await sendWhatsAppMessage(assignedUser?.whatsappNumber as string, [
+        assignedUser?.name as string,
+        task.abbreviation || "default_user",
+        createdUser?.name as string,
+        createdTask.dueDate?.toString() || 'default_date',
+    ], "task_assigned");
 
     return createdTask;
 }
@@ -235,10 +244,58 @@ export async function deleteTask(id: number) {
     if (!foundTask) {
         return null;
     }
+    // Delete the task related logs
+    await db.delete(activityLogModel).where(eq(activityLogModel.taskId, id));
 
+    // Delete the tasks
     await db.delete(taskModel).where(eq(taskModel.id, id));
 
-
-
     return foundTask;
+}
+
+
+export const sendWhatsAppMessage = async (to: string, messageArr: string[] = [], templateName: string) => {
+    console.log("messageArr:", messageArr);
+    try {
+        const requestBody = {
+            countryCode: '+91',
+            phoneNumber: to,
+            type: 'Template',
+            template: {
+                name: templateName,
+                languageCode: 'en',
+                headerValues: ['Alert'],
+                bodyValues: messageArr,
+            },
+            data: {
+                message: '',
+            },
+        };
+        // 
+        const response = await fetch(`https://api.interakt.ai/v1/public/message/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${INTERAKT_API_KEY}`,
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        console.log('Response Status:', response.status);
+        console.log('Response Headers:', [...response.headers.entries()]);
+
+        if (!response.ok) {
+            const errorResponse = await response.json(); // Log the error response
+            throw new Error(`HTTP error! Status: ${response.status}, Message: ${JSON.stringify(errorResponse)}`);
+        }
+
+        const data = await response.json()
+        console.log(data)
+
+        return data;
+
+    } catch (error) {
+        console.error(error);
+        // throw error
+    }
 }

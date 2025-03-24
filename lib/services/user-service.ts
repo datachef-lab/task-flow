@@ -9,10 +9,6 @@ export async function getUserById(id: number) {
         .from(userModel)
         .where(eq(userModel.id, id));
 
-    if (!foundUser) {
-        return null;
-    }
-
     return foundUser;
 }
 

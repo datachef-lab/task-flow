@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { useRouter } from "next/navigation";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,7 @@ import {
 import { Task, User } from "@/db/schema";
 import { format } from "date-fns";
 import { Textarea } from "../ui/textarea";
+import { useUser } from "@clerk/nextjs";
 
 type TaskFormProps = {
   task?: Task;
@@ -21,8 +23,12 @@ type TaskFormProps = {
 };
 
 export function TaskForm({ task, onSubmit }: TaskFormProps) {
+  const router = useRouter();
+  const { user: clerkUser } = useUser();
   const [loading, setLoading] = useState<boolean>(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [createdUser, setCreatedUsers] = useState<User>();
+
   const [formData, setFormData] = useState<Partial<Task>>({
     description: task?.description || "",
     dueDate: task?.dueDate
@@ -37,6 +43,15 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
       const response = await fetch("/api/users");
       const data = await response.json();
       setUsers(data.users);
+
+      const tmpUser = (data.users as User[]).find(
+        (ele) => ele.email === clerkUser?.emailAddresses[0].emailAddress
+      );
+      setCreatedUsers(tmpUser!);
+      setFormData((prev) => ({
+        ...prev,
+        createdUserId: tmpUser!.id as number,
+      }));
     };
 
     fetchUsers();

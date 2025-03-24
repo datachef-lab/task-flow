@@ -7,7 +7,7 @@ import { Suspense } from "react";
 
 export default async function DashboardPage() {
   try {
-    const [{ tasks }, { users }] = await Promise.all([
+    let [{ tasks }, { users }] = await Promise.all([
       getAllTasks(),
       getAllUsers(),
     ]);
@@ -23,6 +23,7 @@ export default async function DashboardPage() {
     );
   } catch (error) {
     console.error("Error loading dashboard:", error);
+    
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">

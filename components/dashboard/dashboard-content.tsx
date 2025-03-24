@@ -10,6 +10,7 @@ import TaskButtonWrapper from "./TaskButtonWrapper";
 import { AnimatedCard } from "./animate-card";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type DashboardContentProps = {
   initialTasks: Task[];
@@ -29,13 +30,22 @@ export function DashboardContent({
   initialTasks,
   onSubmit,
 }: DashboardContentProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [activeTab, setActiveTab] = useState<
+    "all" | "pending" | "completed" | "overdue"
+  >("all");
   const [stats, setStats] = useState<TaskStats>({
     totalTasks: 0,
     completedTasks: 0,
     pendingTasks: 0,
     overdueTasks: 0,
   });
+
+  // Update tasks when initialTasks changes
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
 
   // Calculate stats from tasks instead of fetching from API
   useEffect(() => {
@@ -72,10 +82,12 @@ export function DashboardContent({
 
       // API call
       await onSubmit(type, task);
-
       toast.success(
         `Task ${type === "add" ? "created" : "updated"} successfully`
       );
+
+      // Refresh the page data
+      router.refresh();
     } catch (error) {
       // Rollback on error
       if (type === "add") {
@@ -91,6 +103,32 @@ export function DashboardContent({
       }
       toast.error(`Failed to ${type} task`);
       console.error("Failed to submit task:", error);
+    }
+  };
+
+  const handleTaskDelete = async (taskId: number) => {
+    try {
+      // Optimistically update the UI
+      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete task");
+      }
+
+      toast.success("Task deleted successfully");
+      // Refresh the page data
+      router.refresh();
+    } catch (error) {
+      // Rollback on error
+      setTasks((prevTasks) => [
+        ...prevTasks,
+        tasks.find((t) => t.id === taskId)!,
+      ]);
+      toast.error("Failed to delete task");
     }
   };
 
@@ -172,6 +210,7 @@ export function DashboardContent({
                   : (tab as "pending" | "completed" | "overdue")
               }
               onSubmit={handleSubmit}
+              onTaskDelete={handleTaskDelete}
             />
           </TabsContent>
         ))}
