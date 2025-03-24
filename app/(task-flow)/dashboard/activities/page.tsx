@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Clock, FileEdit, Trash } from "lucide-react";
 import { getAllActivities } from "@/lib/services/activity-service";
 import { ActivityLog } from "@/db/schema";
+import UserCell from "@/components/activities/UserCell";
+import TaskCell from "@/components/activities/TaskCell";
 
 export default function ActivityPage() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -104,6 +106,7 @@ export default function ActivityPage() {
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Task</TableHead>
+                  <TableHead>Description</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Date & Time</TableHead>
                 </TableRow>
@@ -118,8 +121,8 @@ export default function ActivityPage() {
                 )}
                 {activityLogs.map((log) => (
                   <TableRow key={log.id}>
-                    <TableCell className="font-medium">{log.userId}</TableCell>
-                    <TableCell>{log.taskId}</TableCell>
+                    <UserCell userId={log.userId as number} />
+                    <TaskCell taskId={log.taskId as number} />
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {getActionIcon(log.actionType)}

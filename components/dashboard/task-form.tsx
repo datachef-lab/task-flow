@@ -13,6 +13,7 @@ import {
 } from "../ui/select";
 import { Task, User } from "@/db/schema";
 import { format } from "date-fns";
+import { Textarea } from "../ui/textarea";
 
 type TaskFormProps = {
   task?: Task;
@@ -20,10 +21,13 @@ type TaskFormProps = {
 };
 
 export function TaskForm({ task, onSubmit }: TaskFormProps) {
+  const [loading, setLoading] = useState<boolean>(false);
   const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState<Partial<Task>>({
     description: task?.description || "",
-    dueDate: task?.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd") : undefined,
+    dueDate: task?.dueDate
+      ? format(new Date(task.dueDate), "yyyy-MM-dd")
+      : undefined,
     priorityType: task?.priorityType || "normal",
     assignedUserId: task?.assignedUserId || null,
   });
@@ -49,6 +53,7 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
 
     // Convert the form data to match the API expectations
     const submitData = {
@@ -65,6 +70,8 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
       await onSubmit(submitData);
     } catch (error) {
       console.error("Failed to submit task:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,7 +79,7 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
-        <Input
+        <Textarea
           id="description"
           name="description"
           value={formData.description}
@@ -139,8 +146,8 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
         </Select>
       </div>
 
-      <Button type="submit" className="w-full">
-        {task ? "Update Task" : "Create Task"}
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading ? "Please wait..." : task ? "Update Task" : "Create Task"}
       </Button>
     </form>
   );
