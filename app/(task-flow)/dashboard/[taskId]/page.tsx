@@ -2,6 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
 import { Task, User } from "@/db/schema";
 import {
   AlertDialog,
@@ -60,6 +69,13 @@ import { TaskForm } from "@/components/dashboard/task-form";
 import { handleTaskAction } from "@/actions/tasks";
 import TaskButton from "@/components/dashboard/task-button";
 import { useUser } from "@clerk/nextjs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Add interface for file attachment
 interface FileAttachment {
@@ -133,6 +149,7 @@ export default function TaskPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createdUser, setCreatedUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [assignedUser, setAssignedUser] = useState<User | null>(null);
 
   const fetchUser = async (userId: number, user: "created" | "assigned") => {
@@ -167,6 +184,17 @@ export default function TaskPage() {
       size: "645 KB",
     },
   ]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const response = await fetch(`/api/users`);
+      const data = await response.json();
+
+      setUsers(data.users as User[]);
+    };
+
+    fetchUsers();
+  }, []);
 
   useEffect(() => {
     // Fetch task data using taskId
@@ -259,9 +287,9 @@ export default function TaskPage() {
       });
       router.refresh();
       setTask(task);
-      toast.success("Extension request submitted successfully");
+      toast.success("task saved successfully!");
     } catch (error) {
-      toast.error("Some error went while processing for extension request.");
+      toast.error("Some error went.");
     }
   };
 
@@ -732,10 +760,57 @@ export default function TaskPage() {
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                       >
-                        <Button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9">
-                          <Forward className="w-4 h-4 mr-2" />
-                          Forward Task
-                        </Button>
+                        <Dialog>
+                          <DialogTrigger className="w-full">
+                            <Button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9">
+                              <Forward className="w-4 h-4 mr-2" />
+                              Forward Task
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Forward Task...</DialogTitle>
+                              <DialogDescription>
+                                <div className="space-y-2">
+                                  <Label htmlFor="assignedUserId">
+                                    Assign To
+                                  </Label>
+                                  <Select
+                                    name="assignedUserId"
+                                    value={task.assignedUserId?.toString()}
+                                    onValueChange={(value) =>
+                                      setTask((prev) => ({
+                                        ...prev!,
+                                        assignedUserId: Number(value),
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select user" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {users?.map((user) => (
+                                        <SelectItem
+                                          key={user.id}
+                                          value={user.id.toString()}
+                                        >
+                                          {user.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <div className="flex justify-end">
+                                    <Button
+                                      onClick={() => handleUpdateTask(task)}
+                                    >
+                                      Save
+                                    </Button>
+                                  </div>
+                                </div>
+                              </DialogDescription>
+                            </DialogHeader>
+                          </DialogContent>
+                        </Dialog>
                       </motion.div>
                       <motion.div
                         whileHover={{ scale: 1.01 }}

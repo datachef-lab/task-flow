@@ -143,6 +143,7 @@ async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ n
 
     const savedFiles: Array<{ name: string; path: string; type: string }> = [];
 
+
     for (const file of files) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
@@ -162,27 +163,59 @@ async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ n
 
 export async function createTask(givenTask: Task, files?: FileList) {
     const { id, ...props } = givenTask;
-
+    console.log("in creat task,", props);
     // Handle file uploads if provided
-    let savedFiles: Array<{ name: string; path: string; type: string }> = [];
-    if (files && files.length > 0) {
-        savedFiles = await handleTaskFiles(givenTask.id, Array.from(files));
+    // let savedFiles: Array<{ name: string; path: string; type: string }> = [];
+    // try {
+    //     if (files && files.length > 0) {
+    //         savedFiles = await handleTaskFiles(givenTask.id, Array.from(files));
+    //     }
+
+    // } catch (error) {
+    //     console.log(error)
+    // }
+    try {
+        const abbreviation = await getAbbreviation(givenTask.priorityType);
+        const [newTask] = await db
+            .insert(taskModel)
+            .values({ ...props, abbreviation })
+            .returning();
+
+        await createActivityLog({
+            actionType: "create",
+            createdAt: new Date(),
+            id: 0,
+            taskId: newTask.id,
+            userId: newTask.assignedUserId
+        });
+
+        // Send the email
+        const createdUser = await getUserById(newTask.createdUserId as number);
+        const assignedUser = await getUserById(newTask.assignedUserId as number);
+
+        await sendEmail(
+            assignedUser?.email as string,
+            'Task Assignment',
+            `Task "${newTask.abbreviation}" has been assigned to you.`
+        );
+
+        // TODO: Send the WhatsApp
+        await sendWhatsAppMessage(assignedUser?.whatsappNumber as string, [
+            assignedUser?.name as string,
+            newTask.abbreviation || "default_user",
+            createdUser?.name as string,
+            newTask.dueDate?.toString() || 'default_date',
+        ], "task_assigned");
+
+
+        return newTask;
+    } catch (error) {
+        console.log(error)
     }
 
-    const [newTask] = await db
-        .insert(taskModel)
-        .values({ ...props, files: savedFiles })
-        .returning();
 
-    await createActivityLog({
-        actionType: "create",
-        createdAt: new Date(),
-        id: 0,
-        taskId: newTask.id,
-        userId: newTask.assignedUserId
-    });
 
-    return newTask;
+    return null;
 }
 
 export async function updateTask(id: number, givenTask: Task, files?: FileList) {
