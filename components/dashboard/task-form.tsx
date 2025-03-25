@@ -19,7 +19,7 @@ import { useUser } from "@clerk/nextjs";
 
 type TaskFormProps = {
   task?: Task;
-  onSubmit: (task: Partial<Task>) => Promise<void>;
+  onSubmit: (task: Partial<Task> | Task) => Promise<void>;
 };
 
 export function TaskForm({ task, onSubmit }: TaskFormProps) {

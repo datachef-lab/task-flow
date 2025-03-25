@@ -43,6 +43,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { DeleteTaskAlert } from "@/components/dashboard/delete-task-alert";
+import { TaskForm } from "@/components/dashboard/task-form";
+import { handleTaskAction } from "@/actions/tasks";
 
 // Dummy data
 const dummyTask = {
@@ -106,7 +108,7 @@ const getPriorityColor = (priority: string) => {
 export default function TaskPage() {
   const { abbreviation } = useParams<{ abbreviation: string }>();
   const router = useRouter();
-  const [task, setTask] = useState(dummyTask);
+  const [task, setTask] = useState<Task | null>(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newDueDate, setNewDueDate] = useState<string>("");
@@ -131,8 +133,12 @@ export default function TaskPage() {
     toast.success("Extension request submitted successfully");
   };
 
-  const dueDateObj = new Date(task.dueDate);
+  const dueDateObj = new Date();
   const isOverdue = dueDateObj < new Date() && !task.completed;
+
+  const handleSubmit = async (task: Partial<Task> | Task) => {
+    handleTaskAction("edit", task as Task);
+  };
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8 bg-gradient-to-b from-white to-slate-50 min-h-screen">
@@ -186,6 +192,7 @@ export default function TaskPage() {
             </h1>
           </div>
           <div className="flex gap-3 flex-wrap">
+            {task && <TaskForm task={task} onSubmit={handleSubmit} />}
             <Button
               variant="outline"
               onClick={() => setIsEditing(!isEditing)}
@@ -228,7 +235,7 @@ export default function TaskPage() {
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {task.attachments.map((attachment, index) => (
+                  {/* {task.attachments.map((attachment, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, y: 10 }}
@@ -269,7 +276,7 @@ export default function TaskPage() {
                         </a>
                       </Button>
                     </motion.div>
-                  ))}
+                  ))} */}
                 </div>
               </CardContent>
             </Card>
@@ -291,7 +298,7 @@ export default function TaskPage() {
                     <div>
                       <p className="text-xs text-slate-500">Created by</p>
                       <p className="font-medium text-slate-800">
-                        {task.createdBy}
+                        {/* {task.createdBy} */}
                       </p>
                     </div>
                   </div>
@@ -303,7 +310,7 @@ export default function TaskPage() {
                     <div>
                       <p className="text-xs text-slate-500">Assignee</p>
                       <p className="font-medium text-slate-800">
-                        {task.assignee}
+                        {/* {task.assignee} */}
                       </p>
                     </div>
                   </div>
@@ -327,7 +334,7 @@ export default function TaskPage() {
                           isOverdue ? "text-red-600" : "text-slate-800"
                         }`}
                       >
-                        {format(new Date(task.dueDate), "PPP")}
+                        {/* {format(new Date(task.dueDate), "PPP")} */}
                         {isOverdue && (
                           <span className="text-red-500 text-xs ml-2">
                             (Overdue)
@@ -344,7 +351,7 @@ export default function TaskPage() {
                     <div>
                       <p className="text-xs text-slate-500">Created</p>
                       <p className="font-medium text-slate-800">
-                        {format(task.createdAt, "PPP")}
+                        {/* {format(task.createdAt, "PPP")} */}
                       </p>
                     </div>
                   </div>
@@ -356,7 +363,7 @@ export default function TaskPage() {
                     <div>
                       <p className="text-xs text-slate-500">Last Updated</p>
                       <p className="font-medium text-slate-800">
-                        {format(task.updatedAt, "PPP")}
+                        {/* {format(task.updatedAt, "PPP")} */}
                       </p>
                     </div>
                   </div>

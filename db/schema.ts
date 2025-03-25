@@ -8,7 +8,9 @@ export const priorityEnum = pgEnum("priority_type", ["normal", "medium", "high"]
 
 export const intervalEnum = pgEnum("interval_type", ["daily", "weekly", "monthly", "quarterly", "half_yearly", "yearly"]);
 
-export const actionEnum = pgEnum("action_type", ["create", "update", "delete", "completed"])
+export const actionEnum = pgEnum("action_type", ["create", "update", "delete", "completed"]);
+
+export const taskStatusEnum = pgEnum("task_status_type", ["completed", "on_hold", "request_date_extension"]);
 
 // Tables
 export const userModel = pgTable("users", {
@@ -39,6 +41,8 @@ export const taskModel = pgTable("tasks", {
     dueDate: date("due_date").defaultNow(),
     priorityType: priorityEnum("priority_type").default("normal").notNull(),
     completed: boolean().notNull().default(false),
+    status: taskStatusEnum(),
+    remarks: varchar({ length: 500 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
 })
