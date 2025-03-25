@@ -1,0 +1,1 @@
+ALTER TABLE "tasks" ALTER COLUMN "requested_date" DROP DEFAULT;

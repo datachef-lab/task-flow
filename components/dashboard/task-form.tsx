@@ -20,6 +20,7 @@ import { Trash2 } from "lucide-react";
 
 type TaskFormProps = {
   task?: Task;
+  type?: "add" | "edit";
   onSubmit: (formData: Partial<Task>, files?: FileList) => Promise<void>;
 };
 
@@ -29,7 +30,7 @@ type TaskFile = {
   type: string;
 };
 
-export function TaskForm({ task, onSubmit }: TaskFormProps) {
+export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
   const router = useRouter();
   const { user: clerkUser } = useUser();
   const [loading, setLoading] = useState<boolean>(false);
@@ -139,17 +140,32 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
           required
         />
       </div>
+      {type === "edit" && (
+        <div className="space-y-2">
+          <Label htmlFor="description">Remarks</Label>
+          <Textarea
+            id="remarks"
+            name="remarks"
+            value={formData.remarks || ""}
+            onChange={handleChange}
+            placeholder="Remarks"
+            required
+          />
+        </div>
+      )}
 
-      <div className="space-y-2">
-        <Label htmlFor="dueDate">Due Date</Label>
-        <Input
-          id="dueDate"
-          name="dueDate"
-          type="date"
-          value={formData.dueDate || ""}
-          onChange={handleChange}
-        />
-      </div>
+      {type === "add" && (
+        <div className="space-y-2">
+          <Label htmlFor="dueDate">Due Date</Label>
+          <Input
+            id="dueDate"
+            name="dueDate"
+            type="date"
+            value={formData.dueDate || ""}
+            onChange={handleChange}
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="priorityType">Priority</Label>
@@ -171,32 +187,34 @@ export function TaskForm({ task, onSubmit }: TaskFormProps) {
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="assignedUserId">Assign To</Label>
-        <Select
-          name="assignedUserId"
-          value={formData.assignedUserId?.toString()}
-          onValueChange={(value) =>
-            handleChange({
-              target: {
-                name: "assignedUserId",
-                value: value ? Number(value) : null,
-              },
-            })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select user" />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map((user) => (
-              <SelectItem key={user.id} value={user.id.toString()}>
-                {user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {type === "add" && (
+        <div className="space-y-2">
+          <Label htmlFor="assignedUserId">Assign To</Label>
+          <Select
+            name="assignedUserId"
+            value={formData.assignedUserId?.toString()}
+            onValueChange={(value) =>
+              handleChange({
+                target: {
+                  name: "assignedUserId",
+                  value: value ? Number(value) : null,
+                },
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select user" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map((user) => (
+                <SelectItem key={user.id} value={user.id.toString()}>
+                  {user.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Display existing files */}
       {task?.files && (task.files as TaskFile[]).length > 0 && (

@@ -33,7 +33,7 @@ export function DashboardContent({
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [activeTab, setActiveTab] = useState<
-    "all" | "pending" | "completed" | "overdue"
+    "all" | "pending" | "completed" | "overdue" | "date_extension"
   >("all");
   const [stats, setStats] = useState<TaskStats>({
     totalTasks: 0,
@@ -190,30 +190,65 @@ export function DashboardContent({
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="all" className="mt-6">
+      <Tabs
+        defaultValue="all"
+        className="mt-6"
+        onValueChange={(value) => setActiveTab(value as typeof activeTab)}
+      >
         <TabsList>
           <TabsTrigger value="all">All Tasks</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="overdue">Overdue</TabsTrigger>
+          <TabsTrigger value="date_extension">Date Extension</TabsTrigger>
         </TabsList>
 
         {/* Tab Content */}
-        {["all", "pending", "completed", "overdue"].map((tab) => (
-          <TabsContent key={tab} value={tab} className="mt-4">
-            <TaskList
-              users={users}
-              allTasks={tasks}
-              filter={
-                tab === "all"
-                  ? undefined
-                  : (tab as "pending" | "completed" | "overdue")
-              }
-              onSubmit={handleSubmit}
-              onTaskDelete={handleTaskDelete}
-            />
-          </TabsContent>
-        ))}
+        <TabsContent value="all" className="mt-4">
+          <TaskList
+            users={users}
+            allTasks={tasks}
+            filter={undefined}
+            onSubmit={handleSubmit}
+            onTaskDelete={handleTaskDelete}
+          />
+        </TabsContent>
+        <TabsContent value="pending" className="mt-4">
+          <TaskList
+            users={users}
+            allTasks={tasks}
+            filter="pending"
+            onSubmit={handleSubmit}
+            onTaskDelete={handleTaskDelete}
+          />
+        </TabsContent>
+        <TabsContent value="completed" className="mt-4">
+          <TaskList
+            users={users}
+            allTasks={tasks}
+            filter="completed"
+            onSubmit={handleSubmit}
+            onTaskDelete={handleTaskDelete}
+          />
+        </TabsContent>
+        <TabsContent value="overdue" className="mt-4">
+          <TaskList
+            users={users}
+            allTasks={tasks}
+            filter="overdue"
+            onSubmit={handleSubmit}
+            onTaskDelete={handleTaskDelete}
+          />
+        </TabsContent>
+        <TabsContent value="date_extension" className="mt-4">
+          <TaskList
+            users={users}
+            allTasks={tasks}
+            filter="date_extension"
+            onSubmit={handleSubmit}
+            onTaskDelete={handleTaskDelete}
+          />
+        </TabsContent>
       </Tabs>
     </main>
   );

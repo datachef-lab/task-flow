@@ -96,7 +96,8 @@ export default function TaskCard({
   };
 
   const handleRowClick = () => {
-    router.push(`/dashboard/${task.abbreviation}`);
+    const taskId = task.id;
+    router.push(`/dashboard/${taskId}`);
   };
 
   return (

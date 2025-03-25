@@ -14,6 +14,7 @@ import { existsSync } from 'fs';
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
+const DOCUMENT_PATH = process.env.DOCUMENT_PATH;
 
 export async function getAllTasks(page: number = 1, size: number = 100) {
     const offset = (page - 1) * size;
@@ -133,8 +134,8 @@ export async function getTaskById(id: number) {
 }
 
 async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ name: string; path: string; type: string }>> {
-    const uploadDir = join(process.cwd(), "documents", taskId.toString());
-    
+    const uploadDir = join(DOCUMENT_PATH!, "documents", taskId.toString());
+
     // Create task directory if it doesn't exist
     if (!existsSync(uploadDir)) {
         await mkdir(uploadDir, { recursive: true });
@@ -161,7 +162,7 @@ async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ n
 
 export async function createTask(givenTask: Task, files?: FileList) {
     const { id, ...props } = givenTask;
-    
+
     // Handle file uploads if provided
     let savedFiles: Array<{ name: string; path: string; type: string }> = [];
     if (files && files.length > 0) {
@@ -185,13 +186,14 @@ export async function createTask(givenTask: Task, files?: FileList) {
 }
 
 export async function updateTask(id: number, givenTask: Task, files?: FileList) {
+    console.log("in updatedTask(), id:", id, "givenTask:", givenTask);
     const foundTask = await getTaskById(id);
 
     if (!foundTask) {
         return null;
     }
 
-    const { id: tmpId, ...props } = givenTask;
+    const { id: tmpId, createdAt, updatedAt, ...props } = givenTask;
 
     // Handle file uploads if provided
     let savedFiles: Array<{ name: string; path: string; type: string }> = (foundTask.files || []) as Array<{ name: string; path: string; type: string }>;
@@ -200,18 +202,29 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
         savedFiles = [...savedFiles, ...newFiles];
     }
 
-    const [updatedTask] = await db
-        .update(taskModel)
-        .set({ ...props, files: savedFiles })
-        .where(eq(taskModel.id, id))
-        .returning();
+    let updatedTask: Task | null = null;
+
+    try {
+        const [savedTask] = await db
+            .update(taskModel)
+            .set({ ...props, files: savedFiles })
+            .where(eq(taskModel.id, id))
+            .returning();
+
+        console.log("updatedTask:", savedTask);
+        updatedTask = savedTask;
+
+    } catch (error) {
+        console.log(error)
+    }
+
 
     await createActivityLog({
         actionType: "update",
         createdAt: new Date(),
         id: 0,
-        taskId: updatedTask.id,
-        userId: updatedTask.assignedUserId
+        taskId: updatedTask?.id as number,
+        userId: updatedTask?.assignedUserId as number
     });
 
     return updatedTask;
@@ -259,7 +272,13 @@ export async function getAbbreviation(priority: "normal" | "medium" | "high") {
 
 export async function deleteTask(id: number) {
     // Delete all files associated with the task
-    await deleteTaskDirectory(id);
+    try {
+        await deleteTaskDirectory(id);
+    } catch (error) {
+        console.log(error);
+    }
+    // Delete all the activities
+    await db.delete(activityLogModel).where(eq(activityLogModel.taskId, id));
 
     // Delete the task from the database
     const [deletedTask] = await db

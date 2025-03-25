@@ -42,24 +42,31 @@ export default function TaskButton({ type, task, onSubmit }: TaskButtonProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={type === "edit" ? "ghost" : "destructive"}>
-          {type === "add" ? (
-            <>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Task
-            </>
-          ) : (
-            <Pencil className="h-4 w-4" />
-          )}
-        </Button>
+        {type === "edit" ? (
+          <Button
+            variant="outline"
+            className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors shadow-sm h-10"
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Task
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-slate-800">
             {type === "add" ? "Add New Task" : "Edit Task"}
           </DialogTitle>
         </DialogHeader>
-        <TaskForm task={task} onSubmit={handleSubmit} />
+        <TaskForm task={task} type={type} onSubmit={handleSubmit} />
       </DialogContent>
     </Dialog>
   );

@@ -19,7 +19,7 @@ import { DeleteTaskAlert } from "./delete-task-alert";
 
 interface TaskListProps {
   allTasks: Task[];
-  filter?: "all" | "pending" | "completed" | "overdue";
+  filter?: "all" | "pending" | "completed" | "overdue" | "date_extension";
   users: User[];
   onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
   onTaskDelete: (taskId: number) => Promise<void>;
@@ -35,7 +35,7 @@ export function TaskList({
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(allTasks);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
-  const [currentDate, setCurrentDate] = useState(null);
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
 
   useEffect(() => {
     setTasks(allTasks);
@@ -133,6 +133,10 @@ export function TaskList({
       return (
         !task.completed && task.dueDate && new Date(task.dueDate) < new Date()
       );
+
+    if (filter === "date_extension")
+      return !!task.requestedDate && !!task.requestDateExtensionReason;
+
     return true;
   });
 
