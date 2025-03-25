@@ -1,12 +1,16 @@
 "use server";
 
 import { and, count, desc, eq, gt, gte, lt } from "drizzle-orm";
-import { db } from "../../db";
+import { db } from "@/db";
 import { sql } from 'drizzle-orm';
-import { activityLogModel, Task, taskModel } from "../../db/schema";
+import { activityLogModel, Task, taskModel } from "@/db/schema";
 import { createActivityLog } from "./activity-service";
 import { getUserById } from "./user-service";
 import { sendEmail } from "../nodemailer";
+import { deleteTaskDirectory, deleteTaskFile } from './file-service';
+import { join } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
@@ -128,7 +132,59 @@ export async function getTaskById(id: number) {
     return foundTask;
 }
 
-export async function updateTask(id: number, givenTask: Task) {
+async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ name: string; path: string; type: string }>> {
+    const uploadDir = join(process.cwd(), "documents", taskId.toString());
+    
+    // Create task directory if it doesn't exist
+    if (!existsSync(uploadDir)) {
+        await mkdir(uploadDir, { recursive: true });
+    }
+
+    const savedFiles: Array<{ name: string; path: string; type: string }> = [];
+
+    for (const file of files) {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const fileName = file.name;
+        const filePath = join(uploadDir, fileName);
+
+        await writeFile(filePath, buffer);
+        savedFiles.push({
+            name: fileName,
+            path: `/documents/${taskId}/${fileName}`,
+            type: file.type
+        });
+    }
+
+    return savedFiles;
+}
+
+export async function createTask(givenTask: Task, files?: FileList) {
+    const { id, ...props } = givenTask;
+    
+    // Handle file uploads if provided
+    let savedFiles: Array<{ name: string; path: string; type: string }> = [];
+    if (files && files.length > 0) {
+        savedFiles = await handleTaskFiles(givenTask.id, Array.from(files));
+    }
+
+    const [newTask] = await db
+        .insert(taskModel)
+        .values({ ...props, files: savedFiles })
+        .returning();
+
+    await createActivityLog({
+        actionType: "create",
+        createdAt: new Date(),
+        id: 0,
+        taskId: newTask.id,
+        userId: newTask.assignedUserId
+    });
+
+    return newTask;
+}
+
+export async function updateTask(id: number, givenTask: Task, files?: FileList) {
     const foundTask = await getTaskById(id);
 
     if (!foundTask) {
@@ -137,9 +193,16 @@ export async function updateTask(id: number, givenTask: Task) {
 
     const { id: tmpId, ...props } = givenTask;
 
+    // Handle file uploads if provided
+    let savedFiles: Array<{ name: string; path: string; type: string }> = (foundTask.files || []) as Array<{ name: string; path: string; type: string }>;
+    if (files && files.length > 0) {
+        const newFiles = await handleTaskFiles(id, Array.from(files));
+        savedFiles = [...savedFiles, ...newFiles];
+    }
+
     const [updatedTask] = await db
         .update(taskModel)
-        .set({ ...foundTask, ...props })
+        .set({ ...props, files: savedFiles })
         .where(eq(taskModel.id, id))
         .returning();
 
@@ -152,50 +215,6 @@ export async function updateTask(id: number, givenTask: Task) {
     });
 
     return updatedTask;
-}
-
-export async function createTask(task: Task) {
-    const { id, ...data } = task;
-
-    // Set the abbreviation
-    data.abbreviation = await getAbbreviation(data.priorityType);
-
-    // Create the task
-    const [createdTask] = await db
-        .insert(taskModel)
-        .values(data)
-        .returning();
-
-    console.log("Task Created:", createdTask);
-
-    // TODO: Log the activity
-    await createActivityLog({
-        actionType: "create",
-        createdAt: new Date(),
-        id: 0,
-        taskId: createdTask.id,
-        userId: createdTask.createdUserId
-    });
-
-    // Send the email
-    const createdUser = await getUserById(createdTask.createdUserId as number);
-    const assignedUser = await getUserById(createdTask.assignedUserId as number);
-
-    await sendEmail(
-        assignedUser?.email as string,
-        'Task Assignment',
-        `Task "${data.abbreviation}" has been assigned to you.`
-    );
-
-    // TODO: Send the WhatsApp
-    await sendWhatsAppMessage(assignedUser?.whatsappNumber as string, [
-        assignedUser?.name as string,
-        createdTask.abbreviation || "default_user",
-        createdUser?.name as string,
-        createdTask.dueDate?.toString() || 'default_date',
-    ], "task_assigned");
-
-    return createdTask;
 }
 
 export async function getAbbreviation(priority: "normal" | "medium" | "high") {
@@ -239,20 +258,40 @@ export async function getAbbreviation(priority: "normal" | "medium" | "high") {
 }
 
 export async function deleteTask(id: number) {
-    const foundTask = await getTaskById(id);
+    // Delete all files associated with the task
+    await deleteTaskDirectory(id);
 
-    if (!foundTask) {
-        return null;
-    }
-    // Delete the task related logs
-    await db.delete(activityLogModel).where(eq(activityLogModel.taskId, id));
+    // Delete the task from the database
+    const [deletedTask] = await db
+        .delete(taskModel)
+        .where(eq(taskModel.id, id))
+        .returning();
 
-    // Delete the tasks
-    await db.delete(taskModel).where(eq(taskModel.id, id));
-
-    return foundTask;
+    return deletedTask;
 }
 
+export async function deleteTaskFiles(taskId: number, fileNames: string[]) {
+    const task = await getTaskById(taskId);
+    if (!task) return null;
+
+    // Delete each file
+    for (const fileName of fileNames) {
+        await deleteTaskFile(taskId, fileName);
+    }
+
+    // Update the task's files array
+    const remainingFiles = ((task.files || []) as Array<{ name: string; path: string; type: string }>).filter(
+        (file) => !fileNames.includes(file.name)
+    );
+
+    const [updatedTask] = await db
+        .update(taskModel)
+        .set({ files: remainingFiles })
+        .where(eq(taskModel.id, taskId))
+        .returning();
+
+    return updatedTask;
+}
 
 export const sendWhatsAppMessage = async (to: string, messageArr: string[] = [], templateName: string) => {
     console.log("messageArr:", messageArr);

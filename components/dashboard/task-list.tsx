@@ -35,9 +35,11 @@ export function TaskList({
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(allTasks);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [currentDate, setCurrentDate] = useState(null);
 
   useEffect(() => {
     setTasks(allTasks);
+    setCurrentDate(new Date());
   }, [allTasks]);
 
   const toggleTaskCompletion = async (taskId: number) => {

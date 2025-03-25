@@ -16,18 +16,22 @@ import { Plus, Pencil } from "lucide-react";
 type TaskButtonProps = {
   type: "add" | "edit";
   task?: Task;
-  onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
+  onSubmit: (
+    type: "add" | "edit",
+    task: Task,
+    files?: FileList
+  ) => Promise<void>;
 };
 
 export default function TaskButton({ type, task, onSubmit }: TaskButtonProps) {
   const [open, setOpen] = useState(false);
 
-  const handleSubmit = async (formData: Partial<Task>) => {
+  const handleSubmit = async (formData: Partial<Task>, files?: FileList) => {
     try {
       if (type === "add") {
-        await onSubmit("add", formData as Task);
+        await onSubmit("add", formData as Task, files);
       } else if (task) {
-        await onSubmit("edit", { ...task, ...formData });
+        await onSubmit("edit", { ...task, ...formData } as Task, files);
       }
       setOpen(false);
     } catch (error) {

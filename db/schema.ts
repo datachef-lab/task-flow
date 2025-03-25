@@ -1,5 +1,5 @@
 import type { InferModel } from "drizzle-orm"
-import { pgTable, serial, text, timestamp, boolean, integer, pgEnum, varchar, date, time } from "drizzle-orm/pg-core"
+import { pgTable, serial, text, timestamp, boolean, integer, pgEnum, varchar, date, time, json } from "drizzle-orm/pg-core"
 
 // Enums
 export const priorityEnum = pgEnum("priority_type", ["normal", "medium", "high"])
@@ -43,6 +43,7 @@ export const taskModel = pgTable("tasks", {
     completed: boolean().notNull().default(false),
     status: taskStatusEnum(),
     remarks: varchar({ length: 500 }),
+    files: json("files").default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
 })
