@@ -17,13 +17,18 @@ import { Trash } from "lucide-react";
 interface DeleteTaskAlertProps {
   task: Task | null;
   onConfirm: () => void;
+  onCancel: () => void;
 }
 
-export function DeleteTaskAlert({ task, onConfirm }: DeleteTaskAlertProps) {
+export function DeleteTaskAlert({
+  task,
+  onConfirm,
+  onCancel,
+}: DeleteTaskAlertProps) {
   if (!task) return null;
 
   return (
-    <AlertDialog>
+    <AlertDialog open={!!task} onOpenChange={(open) => !open && onCancel()}>
       <AlertDialogTrigger>
         <Button variant="ghost" size="icon">
           <Trash size={17} />
@@ -42,7 +47,7 @@ export function DeleteTaskAlert({ task, onConfirm }: DeleteTaskAlertProps) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>Delete</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

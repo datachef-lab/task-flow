@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DeleteTaskAlert } from "./delete-task-alert";
+import { TableCell, TableRow } from "../ui/table";
 
 type TaskCardProps = {
   task: Task;
@@ -28,18 +29,27 @@ export default function TaskCard({
   onDeleteClick,
 }: TaskCardProps) {
   const [assignedUser, setAssignedUser] = useState<User | null>(null);
+  const [createdUser, setCreatedUser] = useState<User | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     const fetchAssignedUser = async () => {
-      const response = await fetch(`/api/users/${task.assignedUserId}`);
-      const data = await response.json();
-      console.log("users:", data);
-      setAssignedUser(data);
+      const user = await fetchUserById(task.assignedUserId as number);
+      setAssignedUser(user as User);
+    };
+    const fetchCreatedUser = async () => {
+      const user = await fetchUserById(task.createdUserId as number);
+      setCreatedUser(user as User);
     };
 
     fetchAssignedUser();
+    fetchCreatedUser();
   }, []);
+
+  const fetchUserById = async (id: number) => {
+    const response = await fetch(`/api/users/${id}`);
+    return await response.json();
+  };
 
   const toggleTaskCompletion = async () => {
     try {
@@ -77,100 +87,138 @@ export default function TaskCard({
       case "high":
         return "bg-red-500";
       case "medium":
-        return "bg-yellow-500";
-      case "low":
-        return "bg-green-500";
+        return "bg-blue-500";
+      case "normal":
+        return "border border-slate-300 bg-transparent text-black";
       default:
         return "bg-blue-500";
     }
   };
 
+  const handleRowClick = () => {
+    router.push(`/dashboard/${task.abbreviation}`);
+  };
+
   return (
-    <motion.div
-      key={task.id}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-    >
-      <Card
-        className={`${task.completed ? "bg-muted/50" : ""} transition-colors`}
+    <>
+      <TableRow className="cursor-pointer" onClick={handleRowClick}>
+        <TableCell>{index + 1}</TableCell>
+        <TableCell>
+          <p className="text-xs text-muted-foreground">#{task.abbreviation}</p>
+          <p>{task.description}</p>
+        </TableCell>
+        <TableCell>
+          {task.dueDate
+            ? format(new Date(task.dueDate), "MMM d, yyyy")
+            : "No due date"}
+        </TableCell>
+        <TableCell>{""}</TableCell>
+        <TableCell>{assignedUser?.name}</TableCell>
+        <TableCell>{createdUser?.name}</TableCell>
+        <TableCell>
+          <Badge
+            className={`${getPriorityColor(
+              task.priorityType
+            )} hover:${getPriorityColor(task.priorityType)}`}
+          >
+            {task.priorityType.toUpperCase()}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          {task.createdAt
+            ? format(new Date(task.createdAt), "MMM d, yyyy")
+            : "No due date"}
+        </TableCell>
+      </TableRow>
+    </>
+  );
+}
+
+/*
+ <motion.div
+        key={task.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: index * 0.05 }}
       >
-        <CardHeader className="p-4 pb-0">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-2">
-              <Checkbox
-                checked={task.completed}
-                onCheckedChange={toggleTaskCompletion}
-                className="mt-1"
-              />
-              <div>
-                <h3
-                  className={`font-medium ${
-                    task.completed ? "line-through text-muted-foreground" : ""
-                  }`}
-                >
-                  {task.description}
-                </h3>
-                <p className="text-muted-foreground text-xs mb-3">
-                  {task.abbreviation}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Assigned to {assignedUser?.name}
-                </p>
+        <Card
+          className={`${task.completed ? "bg-muted/50" : ""} transition-colors`}
+        >
+          <CardHeader className="p-4 pb-0">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  checked={task.completed}
+                  onCheckedChange={toggleTaskCompletion}
+                  className="mt-1"
+                />
+                <div>
+                  <h3
+                    className={`font-medium ${
+                      task.completed ? "line-through text-muted-foreground" : ""
+                    }`}
+                  >
+                    {task.description}
+                  </h3>
+                  <p className="text-muted-foreground text-xs mb-3">
+                    {task.abbreviation}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Assigned to {assignedUser?.name}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-2 w-2 rounded-full ${getPriorityColor(
-                  task.priorityType
-                )}`}
-              />
-              <Badge variant="outline" className="capitalize">
-                {task.priorityType}
-              </Badge>
-              <TaskButton type="edit" task={task} onSubmit={onSubmit} />
-              <DeleteTaskAlert onConfirm={handleDeleteTask} task={task}  />
-              {/* <Button
+              <div className="flex items-center gap-2">
+                <div
+                  className={`h-2 w-2 rounded-full ${getPriorityColor(
+                    task.priorityType
+                  )}`}
+                />
+                <Badge variant="outline" className="capitalize">
+                  {task.priorityType}
+                </Badge>
+                <TaskButton type="edit" task={task} onSubmit={onSubmit} />
+                <DeleteTaskAlert onConfirm={handleDeleteTask} task={task} />
+                {/* <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleDeleteTask}
                 className="text-red-500 hover:text-red-700 hover:bg-red-50"
               >
                 <Trash className="h-4 w-4" />
-              </Button> */}
+              </Button> 
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              <span>
-                Due:{" "}
-                {task.dueDate
-                  ? format(new Date(task.dueDate), "MMM d, yyyy")
-                  : "No due date"}
-              </span>
-            </div>
-            {task.dueDate &&
-              new Date(task.dueDate) < new Date() &&
-              !task.completed && (
-                <Badge variant="destructive" className="text-xs">
-                  Overdue
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                <span>
+                  Due:{" "}
+                  {task.dueDate
+                    ? format(new Date(task.dueDate), "MMM d, yyyy")
+                    : "No due date"}
+                </span>
+              </div>
+              {task.dueDate &&
+                new Date(task.dueDate) < new Date() &&
+                !task.completed && (
+                  <Badge variant="destructive" className="text-xs">
+                    Overdue
+                  </Badge>
+                )}
+              {task.completed && (
+                <Badge
+                  variant="outline"
+                  className="text-xs bg-green-50 text-green-700 border-green-200"
+                >
+                  <CheckCircle className="mr-1 h-3 w-3" />
+                  Completed
                 </Badge>
               )}
-            {task.completed && (
-              <Badge
-                variant="outline"
-                className="text-xs bg-green-50 text-green-700 border-green-200"
-              >
-                <CheckCircle className="mr-1 h-3 w-3" />
-                Completed
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+*/

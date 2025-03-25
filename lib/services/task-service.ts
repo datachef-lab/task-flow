@@ -190,7 +190,7 @@ export async function createTask(task: Task) {
     // TODO: Send the WhatsApp
     await sendWhatsAppMessage(assignedUser?.whatsappNumber as string, [
         assignedUser?.name as string,
-        task.abbreviation || "default_user",
+        createdTask.abbreviation || "default_user",
         createdUser?.name as string,
         createdTask.dueDate?.toString() || 'default_date',
     ], "task_assigned");

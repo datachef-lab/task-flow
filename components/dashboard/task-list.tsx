@@ -1,5 +1,15 @@
 "use client";
 
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
 import { useEffect, useState } from "react";
 import { Task, User } from "@/db/schema";
 import TaskCard from "./task-card";
@@ -126,28 +136,45 @@ export function TaskList({
 
   return (
     <div className="space-y-4">
-      {filteredTasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8">
-          <div className="text-center">
-            <h3 className="text-lg font-medium">No tasks found</h3>
-            <p className="text-sm text-muted-foreground">
-              {filter
-                ? `There are no ${filter} tasks at the moment.`
-                : "Create a new task to get started."}
-            </p>
-          </div>
-        </div>
-      ) : (
-        filteredTasks.map((task, index) => (
-          <TaskCard
-            index={index}
-            key={task.id}
-            task={task}
-            onSubmit={onSubmit}
-            onDeleteClick={() => handleDeleteConfirm(task)}
-          />
-        ))
-      )}
+      <Table>
+        <TableCaption>A list of your recent invoices.</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[100px]">Sr. No.</TableHead>
+            <TableHead>Task</TableHead>
+            <TableHead>Due</TableHead>
+            <TableHead>Remarks</TableHead>
+            <TableHead>Assignee</TableHead>
+            <TableHead>By</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead>Last Updated</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredTasks.length === 0 ? (
+            <TableRow>
+              <div className="text-center">
+                <h3 className="text-lg font-medium">No tasks found</h3>
+                <p className="text-sm text-muted-foreground">
+                  {filter
+                    ? `There are no ${filter} tasks at the moment.`
+                    : "Create a new task to get started."}
+                </p>
+              </div>
+            </TableRow>
+          ) : (
+            filteredTasks.map((task, index) => (
+              <TaskCard
+                index={index}
+                key={task.id}
+                task={task}
+                onSubmit={onSubmit}
+                onDeleteClick={() => handleDeleteConfirm(task)}
+              />
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
 }
