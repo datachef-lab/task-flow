@@ -783,8 +783,9 @@ export default function TaskPage() {
                                       task.status as "on_hold" | "completed"
                                     }
                                     onValueChange={(value) => {
-                                      const newTask = {
+                                      const newTask: Task = {
                                         ...task,
+                                        completed: value === "completed",
                                         status: value as
                                           | "completed"
                                           | "on_hold",
@@ -872,20 +873,22 @@ export default function TaskPage() {
                           </Dialog>
                         </motion.div>
                       )}
-                      {task.status !== "completed" && <motion.div
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsEditing(!isEditing)}
-                          disabled={!!task.requestDateExtensionReason}
-                          className="w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-sm h-9"
+                      {task.status !== "completed" && (
+                        <motion.div
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
                         >
-                          <AlertCircle className="w-4 h-4 mr-2" />
-                          Request Extension
-                        </Button>
-                      </motion.div>}
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsEditing(!isEditing)}
+                            disabled={!!task.requestDateExtensionReason}
+                            className="w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-sm h-9"
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2" />
+                            Request Extension
+                          </Button>
+                        </motion.div>
+                      )}
                     </div>
 
                     {(isEditing || task.requestDateExtensionReason) && (
