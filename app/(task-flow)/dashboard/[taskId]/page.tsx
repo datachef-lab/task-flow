@@ -779,7 +779,9 @@ export default function TaskPage() {
                                   <Label htmlFor="status">Status</Label>
                                   <Select
                                     name="status"
-                                    value={task.status || "on_hold"}
+                                    value={
+                                      task.status as "on_hold" | "completed"
+                                    }
                                     onValueChange={(value) => {
                                       const newTask = {
                                         ...task,
@@ -809,66 +811,68 @@ export default function TaskPage() {
                           </DialogContent>
                         </Dialog>
                       </motion.div>
-                      <motion.div
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Dialog>
-                          <DialogTrigger className="w-full">
-                            <Button
-                              disabled={task.status === "completed"}
-                              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9"
-                            >
-                              <Forward className="w-4 h-4 mr-2" />
-                              Forward Task
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Forward Task...</DialogTitle>
-                              <DialogDescription>
-                                <div className="space-y-2">
-                                  <Label htmlFor="assignedUserId">
-                                    Assign To
-                                  </Label>
-                                  <Select
-                                    name="assignedUserId"
-                                    value={task.assignedUserId?.toString()}
-                                    onValueChange={(value) =>
-                                      setTask((prev) => ({
-                                        ...prev!,
-                                        assignedUserId: Number(value),
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select user" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {users?.map((user) => (
-                                        <SelectItem
-                                          key={user.id}
-                                          value={user.id.toString()}
-                                        >
-                                          {user.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <div className="flex justify-end">
-                                    <Button
-                                      onClick={() => handleUpdateTask(task)}
+                      {task.status !== "completed" && (
+                        <motion.div
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Dialog>
+                            <DialogTrigger className="w-full">
+                              <Button
+                                disabled={task.status === "completed"}
+                                className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9"
+                              >
+                                <Forward className="w-4 h-4 mr-2" />
+                                Forward Task
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Forward Task...</DialogTitle>
+                                <DialogDescription>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="assignedUserId">
+                                      Assign To
+                                    </Label>
+                                    <Select
+                                      name="assignedUserId"
+                                      value={task.assignedUserId?.toString()}
+                                      onValueChange={(value) =>
+                                        setTask((prev) => ({
+                                          ...prev!,
+                                          assignedUserId: Number(value),
+                                        }))
+                                      }
                                     >
-                                      Save
-                                    </Button>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select user" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {users?.map((user) => (
+                                          <SelectItem
+                                            key={user.id}
+                                            value={user.id.toString()}
+                                          >
+                                            {user.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <div className="flex justify-end">
+                                      <Button
+                                        onClick={() => handleUpdateTask(task)}
+                                      >
+                                        Save
+                                      </Button>
+                                    </div>
                                   </div>
-                                </div>
-                              </DialogDescription>
-                            </DialogHeader>
-                          </DialogContent>
-                        </Dialog>
-                      </motion.div>
-                      <motion.div
+                                </DialogDescription>
+                              </DialogHeader>
+                            </DialogContent>
+                          </Dialog>
+                        </motion.div>
+                      )}
+                      {task.status !== "completed" && <motion.div
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -881,7 +885,7 @@ export default function TaskPage() {
                           <AlertCircle className="w-4 h-4 mr-2" />
                           Request Extension
                         </Button>
-                      </motion.div>
+                      </motion.div>}
                     </div>
 
                     {(isEditing || task.requestDateExtensionReason) && (
