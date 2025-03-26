@@ -411,7 +411,7 @@ export default function TaskPage() {
                     : "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
                 }`}
               >
-                {task?.priorityType} priority
+                {task?.priorityType.toUpperCase()}
               </Badge>
             </div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-800 leading-tight line-clamp-2 mb-1">
@@ -420,32 +420,34 @@ export default function TaskPage() {
           </div>
           <div className="flex flex-wrap gap-2 mt-2 lg:mt-0 lg:flex-nowrap">
             {assignedUser?.email ===
-              clerkUser?.emailAddresses[0].emailAddress && (
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <TaskButton type="edit" onSubmit={handleSubmit} task={task} />
-              </motion.div>
-            )}
+              clerkUser?.emailAddresses[0].emailAddress &&
+              task.status !== "completed" && (
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <TaskButton type="edit" onSubmit={handleSubmit} task={task} />
+                </motion.div>
+              )}
             {(assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress ||
               createdUser?.email ===
-                clerkUser?.emailAddresses[0].emailAddress) && (
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <Button
-                  variant="outline"
-                  onClick={handleDelete}
-                  className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors shadow-sm h-10"
+                clerkUser?.emailAddresses[0].emailAddress) &&
+              task.status !== "completed" && (
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </Button>
-              </motion.div>
-            )}
+                  <Button
+                    variant="outline"
+                    onClick={handleDelete}
+                    className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors shadow-sm h-10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                </motion.div>
+              )}
             {(task.requestDateExtensionReason ||
               task.isRequestDateExtensionApproved) && (
               <motion.div>
@@ -762,7 +764,61 @@ export default function TaskPage() {
                       >
                         <Dialog>
                           <DialogTrigger className="w-full">
-                            <Button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9">
+                            <Button className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white shadow-sm h-9">
+                              <Forward className="w-4 h-4 mr-2" />
+                              {task.status
+                                ? `Task Status: ${task.status?.toUpperCase()}`
+                                : "In Progress"}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Update Task Status</DialogTitle>
+                              <DialogDescription>
+                                <div className="space-y-2">
+                                  <Label htmlFor="status">Status</Label>
+                                  <Select
+                                    name="status"
+                                    value={task.status || "on_hold"}
+                                    onValueChange={(value) => {
+                                      const newTask = {
+                                        ...task,
+                                        status: value as
+                                          | "completed"
+                                          | "on_hold",
+                                      };
+                                      setTask(newTask);
+                                      handleUpdateTask(newTask);
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="on_hold">
+                                        On Hold
+                                      </SelectItem>
+                                      <SelectItem value="completed">
+                                        Completed
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </DialogDescription>
+                            </DialogHeader>
+                          </DialogContent>
+                        </Dialog>
+                      </motion.div>
+                      <motion.div
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <Dialog>
+                          <DialogTrigger className="w-full">
+                            <Button
+                              disabled={task.status === "completed"}
+                              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9"
+                            >
                               <Forward className="w-4 h-4 mr-2" />
                               Forward Task
                             </Button>
@@ -882,7 +938,10 @@ export default function TaskPage() {
                         >
                           <Button
                             onClick={handleRequestExtension}
-                            disabled={!!task.requestDateExtensionReason}
+                            disabled={
+                              !!task.requestDateExtensionReason ||
+                              task.status === "completed"
+                            }
                             className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm h-9"
                           >
                             Submit Request
