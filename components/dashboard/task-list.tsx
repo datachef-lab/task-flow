@@ -29,6 +29,9 @@ import {
   Trash2,
   MessageSquare,
   PauseCircle,
+  ChevronLeft,
+  ChevronRight,
+  ListFilter,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -42,6 +45,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface TaskListProps {
   allTasks: Task[];
@@ -65,6 +83,12 @@ export function TaskList({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
+  const [assigneeFilter, setAssigneeFilter] = useState<number | null>(null);
 
   useEffect(() => {
     setTasks(allTasks);
@@ -188,6 +212,16 @@ export function TaskList({
         task.abbreviation?.toLowerCase().includes(query) ||
         task.remarks?.toLowerCase().includes(query)
       );
+    })
+    .filter((task) => {
+      // Filter by priority
+      if (!priorityFilter) return true;
+      return task.priorityType === priorityFilter;
+    })
+    .filter((task) => {
+      // Filter by assignee
+      if (!assigneeFilter) return true;
+      return task.assignedUserId === assigneeFilter;
     });
 
   // Sort tasks
@@ -219,6 +253,18 @@ export function TaskList({
       return sortDirection === "asc" ? compareResult : -compareResult;
     });
   }
+
+  // Pagination logic
+  const totalTasks = filteredTasks.length;
+  const totalPages = Math.ceil(totalTasks / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalTasks);
+  const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const noTasksMessage = () => {
     let message = "No tasks found";
@@ -253,6 +299,57 @@ export function TaskList({
     );
   };
 
+  // Generate pagination numbers
+  const getPaginationItems = () => {
+    const items = [];
+    const maxPages = 5; // Max number of page links to show
+
+    if (totalPages <= maxPages) {
+      // Show all pages if totalPages <= maxPages
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(i);
+      }
+    } else {
+      // Always show first page
+      items.push(1);
+
+      let startPage = Math.max(2, currentPage - 1);
+      let endPage = Math.min(totalPages - 1, currentPage + 1);
+
+      // Adjust if we're near the start
+      if (currentPage <= 3) {
+        endPage = Math.min(totalPages - 1, maxPages - 1);
+      }
+
+      // Adjust if we're near the end
+      if (currentPage >= totalPages - 2) {
+        startPage = Math.max(2, totalPages - maxPages + 2);
+      }
+
+      // Add ellipsis after first page if needed
+      if (startPage > 2) {
+        items.push("ellipsis1");
+      }
+
+      // Add middle pages
+      for (let i = startPage; i <= endPage; i++) {
+        items.push(i);
+      }
+
+      // Add ellipsis before last page if needed
+      if (endPage < totalPages - 1) {
+        items.push("ellipsis2");
+      }
+
+      // Always show last page
+      if (totalPages > 1) {
+        items.push(totalPages);
+      }
+    }
+
+    return items;
+  };
+
   return (
     <div className="space-y-6 w-full">
       {/* Search and filters bar */}
@@ -276,13 +373,63 @@ export function TaskList({
             </Button>
           )}
         </div>
-        <div className="flex items-center gap-2 self-end">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
+            <Select
+              value={priorityFilter || "all"}
+              onValueChange={(value) =>
+                setPriorityFilter(value === "all" ? null : value)
+              }
+            >
+              <SelectTrigger className="h-9 w-[130px] bg-white border-slate-200 focus:ring-indigo-500">
+                <div className="flex items-center gap-2 text-sm">
+                  <ListFilter className="h-3.5 w-3.5 text-slate-500" />
+                  {priorityFilter
+                    ? priorityFilter.charAt(0).toUpperCase() +
+                      priorityFilter.slice(1)
+                    : "Priority"}
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={assigneeFilter?.toString() || "all"}
+              onValueChange={(value) =>
+                setAssigneeFilter(value === "all" ? null : Number(value))
+              }
+            >
+              <SelectTrigger className="h-9 w-[130px] bg-white border-slate-200 focus:ring-indigo-500">
+                <div className="flex items-center gap-2 text-sm truncate">
+                  <ListFilter className="h-3.5 w-3.5 text-slate-500" />
+                  {assigneeFilter
+                    ? users
+                        .find((u) => u.id === assigneeFilter)
+                        ?.name?.split(" ")[0] || "Assignee"
+                    : "Assignee"}
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id.toString()}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Badge
             variant="outline"
-            className="bg-slate-100 text-slate-700 px-3 py-1"
+            className="bg-indigo-50 text-indigo-700 border-indigo-200 px-3 py-1 font-medium"
           >
-            {filteredTasks.length}{" "}
-            {filteredTasks.length === 1 ? "task" : "tasks"}
+            {totalTasks} {totalTasks === 1 ? "task" : "tasks"}
           </Badge>
         </div>
       </div>
@@ -317,63 +464,63 @@ export function TaskList({
         <div className="border border-slate-200 rounded-lg shadow-sm overflow-hidden w-full">
           <div className="w-full overflow-x-auto">
             <Table className="w-full">
-              <TableHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
+              <TableHeader className="bg-gradient-to-r from-indigo-50/80 to-slate-50 border-b border-slate-200">
                 <TableRow>
                   <TableHead
-                    className="font-semibold text-slate-700 w-[10%] whitespace-nowrap px-4 py-3.5"
+                    className="font-semibold text-slate-700 w-[10%] whitespace-nowrap px-4 py-4"
                     onClick={() => handleSort("abbreviation")}
                   >
-                    <div className="flex items-center cursor-pointer hover:text-indigo-700">
+                    <div className="flex items-center cursor-pointer hover:text-indigo-700 transition-colors">
                       Task ID
                       {renderSortIcon("abbreviation")}
                     </div>
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-slate-700 w-[30%] px-4 py-3.5"
+                    className="font-semibold text-slate-700 w-[30%] px-4 py-4"
                     onClick={() => handleSort("description")}
                   >
-                    <div className="flex items-center cursor-pointer hover:text-indigo-700">
+                    <div className="flex items-center cursor-pointer hover:text-indigo-700 transition-colors">
                       Description
                       {renderSortIcon("description")}
                     </div>
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-slate-700 w-[12%] whitespace-nowrap px-4 py-3.5"
+                    className="font-semibold text-slate-700 w-[12%] whitespace-nowrap px-4 py-4"
                     onClick={() => handleSort("dueDate")}
                   >
-                    <div className="flex items-center cursor-pointer hover:text-indigo-700">
+                    <div className="flex items-center cursor-pointer hover:text-indigo-700 transition-colors">
                       Due Date
                       {renderSortIcon("dueDate")}
                     </div>
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-slate-700 w-[12%] px-4 py-3.5"
+                    className="font-semibold text-slate-700 w-[12%] px-4 py-4"
                     onClick={() => handleSort("assignedUser")}
                   >
-                    <div className="flex items-center cursor-pointer hover:text-indigo-700">
+                    <div className="flex items-center cursor-pointer hover:text-indigo-700 transition-colors">
                       Assignee
                       {renderSortIcon("assignedUser")}
                     </div>
                   </TableHead>
                   <TableHead
-                    className="font-semibold text-slate-700 w-[10%] px-4 py-3.5"
+                    className="font-semibold text-slate-700 w-[10%] px-4 py-4"
                     onClick={() => handleSort("priorityType")}
                   >
-                    <div className="flex items-center cursor-pointer hover:text-indigo-700">
+                    <div className="flex items-center cursor-pointer hover:text-indigo-700 transition-colors">
                       Priority
                       {renderSortIcon("priorityType")}
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-700 w-[12%] text-center whitespace-nowrap px-4 py-3.5">
+                  <TableHead className="font-semibold text-slate-700 w-[12%] text-center whitespace-nowrap px-4 py-4">
                     Status
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-700 w-[14%] text-right px-4 py-3.5">
+                  <TableHead className="font-semibold text-slate-700 w-[14%] text-right px-4 py-4">
                     Actions
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTasks.map((task, index) => {
+                {paginatedTasks.map((task, index) => {
                   const isOverdue =
                     task.dueDate &&
                     !task.completed &&
@@ -390,22 +537,22 @@ export function TaskList({
                       className={`${
                         task.completed
                           ? "bg-slate-50/80"
-                          : "hover:bg-slate-50/80"
+                          : "hover:bg-indigo-50/30"
                       } cursor-pointer transition-colors border-b border-slate-100 last:border-0`}
                       onClick={() => handleRowClick(task.id)}
                     >
-                      <TableCell className="font-medium py-4 px-4">
+                      <TableCell className="font-medium py-4 px-4 align-middle">
                         <div className="flex items-center space-x-2">
                           <Badge
                             variant="outline"
-                            className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200"
+                            className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200 font-medium px-2.5 py-0.5"
                           >
                             {task.abbreviation}
                           </Badge>
                         </div>
                       </TableCell>
 
-                      <TableCell className="py-4 px-4">
+                      <TableCell className="py-4 px-4 align-middle">
                         <div className="max-w-full pr-4">
                           <div
                             className={`font-medium ${
@@ -420,7 +567,7 @@ export function TaskList({
                             <div className="mt-1.5 flex items-center">
                               <Badge
                                 variant="outline"
-                                className="bg-amber-50 text-amber-700 border-amber-200 text-xs gap-1 flex items-center"
+                                className="bg-amber-50 text-amber-700 border-amber-200 text-xs gap-1 flex items-center px-2 py-0.5"
                               >
                                 <AlertCircle className="h-3 w-3" />
                                 Extension Requested
@@ -430,7 +577,7 @@ export function TaskList({
                         </div>
                       </TableCell>
 
-                      <TableCell className="py-4 px-4 whitespace-nowrap">
+                      <TableCell className="py-4 px-4 whitespace-nowrap align-middle">
                         <div className="flex items-center gap-1.5">
                           <Calendar
                             className={`h-3.5 w-3.5 ${
@@ -451,45 +598,45 @@ export function TaskList({
                         </div>
                       </TableCell>
 
-                      <TableCell className="py-4 px-4">
+                      <TableCell className="py-4 px-4 align-middle">
                         <div className="flex items-center gap-2 text-sm text-slate-600">
                           <Avatar className="h-7 w-7 border border-white bg-indigo-100 shadow-sm">
-                            <AvatarFallback className="text-xs text-indigo-700">
+                            <AvatarFallback className="text-xs text-indigo-700 font-medium">
                               {assignedUser?.name?.charAt(0) || "?"}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="truncate max-w-[100px]">
+                          <span className="truncate max-w-[100px] font-medium">
                             {assignedUser?.name || "Unassigned"}
                           </span>
                         </div>
                       </TableCell>
 
-                      <TableCell className="py-4 px-4">
+                      <TableCell className="py-4 px-4 align-middle">
                         {getPriorityBadge(task.priorityType)}
                       </TableCell>
 
-                      <TableCell className="text-center py-4 px-4 whitespace-nowrap">
+                      <TableCell className="text-center py-4 px-4 whitespace-nowrap align-middle">
                         {task.completed ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 gap-1 text-xs font-medium py-1 px-2">
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
                             <CheckCircle className="h-3 w-3" /> Complete
                           </Badge>
                         ) : isOverdue ? (
-                          <Badge className="bg-red-100 text-red-800 border-red-200 gap-1 text-xs font-medium py-1 px-2">
+                          <Badge className="bg-red-100 text-red-800 border-red-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
                             <Clock className="h-3 w-3" /> Overdue
                           </Badge>
                         ) : task.status === "on_hold" ? (
-                          <Badge className="bg-slate-100 text-slate-800 border-slate-200 gap-1 text-xs font-medium py-1 px-2">
+                          <Badge className="bg-slate-100 text-slate-800 border-slate-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
                             <PauseCircle className="h-3 w-3" /> On Hold
                           </Badge>
                         ) : (
-                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 gap-1 text-xs font-medium py-1 px-2">
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
                             <Clock className="h-3 w-3" /> In Progress
                           </Badge>
                         )}
                       </TableCell>
 
-                      <TableCell className="text-right py-4 px-4">
-                        <div className="flex items-center justify-end gap-2">
+                      <TableCell className="text-right py-4 px-4 align-middle">
+                        <div className="flex items-center justify-end gap-1">
                           <TooltipProvider delayDuration={200}>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -555,6 +702,108 @@ export function TaskList({
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 gap-4 rounded-b-lg">
+              <div className="flex items-center gap-2">
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value));
+                    setCurrentPage(1); // Reset to first page when changing page size
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px] bg-white border-slate-200 focus:ring-indigo-500">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-slate-700">per page</span>
+              </div>
+
+              <div className="flex justify-center sm:justify-start">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage > 1)
+                            handlePageChange(currentPage - 1);
+                        }}
+                        className={`${
+                          currentPage === 1
+                            ? "opacity-50 pointer-events-none"
+                            : "hover:bg-indigo-50 hover:text-indigo-700"
+                        } transition-colors`}
+                      />
+                    </PaginationItem>
+
+                    {getPaginationItems().map((item, i) => (
+                      <PaginationItem key={i}>
+                        {item === "ellipsis1" || item === "ellipsis2" ? (
+                          <span className="flex h-9 w-9 items-center justify-center text-slate-400">
+                            ...
+                          </span>
+                        ) : (
+                          <PaginationLink
+                            href="#"
+                            isActive={currentPage === item}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handlePageChange(item as number);
+                            }}
+                            className={`${
+                              currentPage === item
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 font-medium"
+                                : "hover:bg-slate-50"
+                            } transition-colors`}
+                          >
+                            {item}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage < totalPages)
+                            handlePageChange(currentPage + 1);
+                        }}
+                        className={`${
+                          currentPage === totalPages
+                            ? "opacity-50 pointer-events-none"
+                            : "hover:bg-indigo-50 hover:text-indigo-700"
+                        } transition-colors`}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+
+              <div className="text-sm text-slate-500 text-center sm:text-right">
+                Showing{" "}
+                <span className="font-medium text-slate-900">
+                  {Math.min(startIndex + 1, totalTasks)}
+                </span>{" "}
+                to{" "}
+                <span className="font-medium text-slate-900">{endIndex}</span>{" "}
+                of{" "}
+                <span className="font-medium text-slate-900">{totalTasks}</span>{" "}
+                results
+              </div>
+            </div>
+          )}
         </div>
       )}
 
