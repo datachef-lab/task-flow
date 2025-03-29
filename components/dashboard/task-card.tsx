@@ -1,19 +1,34 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader } from "../ui/card";
+import { Card, CardContent, CardHeader, CardFooter } from "../ui/card";
 import { Checkbox } from "../ui/checkbox";
 import { Badge } from "../ui/badge";
 import TaskButton from "./task-button";
-import { format } from "date-fns";
+import { format, isAfter, isBefore, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { CheckCircle, Clock, MoreHorizontal, Trash } from "lucide-react";
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Trash2,
+  Calendar,
+  ArrowRight,
+  User,
+  MessageSquare,
+  PauseCircle,
+} from "lucide-react";
 import { Task, User } from "@/db/schema";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { DeleteTaskAlert } from "./delete-task-alert";
-import { TableCell, TableRow } from "../ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type TaskCardProps = {
   task: Task;
@@ -44,14 +59,15 @@ export default function TaskCard({
 
     fetchAssignedUser();
     fetchCreatedUser();
-  }, []);
+  }, [task.assignedUserId, task.createdUserId]);
 
   const fetchUserById = async (id: number) => {
     const response = await fetch(`/api/users/${id}`);
     return await response.json();
   };
 
-  const toggleTaskCompletion = async () => {
+  const toggleTaskCompletion = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
     try {
       const isConfirmed = confirm(
         `Do you want to ${!task.completed ? "complete" : "reopen"} ${
@@ -78,60 +94,198 @@ export default function TaskCard({
     }
   };
 
-  const handleDeleteTask = async () => {
+  const handleDeleteTask = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
     await onDeleteClick();
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
-        return "bg-red-500";
+        return {
+          bg: "bg-gradient-to-r from-red-500 to-pink-500 text-white",
+          border: "border-red-300",
+          text: "text-red-700",
+          hover: "hover:bg-red-50",
+          icon: "text-red-500",
+          light: "bg-red-50",
+        };
       case "medium":
-        return "bg-blue-500";
+        return {
+          bg: "bg-gradient-to-r from-amber-500 to-orange-500 text-white",
+          border: "border-amber-300",
+          text: "text-amber-700",
+          hover: "hover:bg-amber-50",
+          icon: "text-amber-500",
+          light: "bg-amber-50",
+        };
       case "normal":
-        return "border border-slate-300 bg-transparent text-black";
       default:
-        return "bg-blue-500";
+        return {
+          bg: "bg-gradient-to-r from-blue-500 to-cyan-500 text-white",
+          border: "border-blue-300",
+          text: "text-blue-700",
+          hover: "hover:bg-blue-50",
+          icon: "text-blue-500",
+          light: "bg-blue-50",
+        };
     }
   };
 
-  const handleRowClick = () => {
+  const priorityStyles = getPriorityColor(task.priorityType);
+
+  const handleCardClick = () => {
     const taskId = task.id;
     router.push(`/dashboard/${taskId}`);
   };
 
+  // Check if the task is overdue
+  const isOverdue =
+    task.dueDate &&
+    !task.completed &&
+    isBefore(new Date(task.dueDate), new Date());
+
+  // Format the due date
+  const formattedDueDate = task.dueDate
+    ? format(new Date(task.dueDate), "MMM d, yyyy")
+    : "No due date";
+
   return (
-    <>
-      <TableRow className="cursor-pointer" onClick={handleRowClick}>
-        <TableCell>{index + 1}</TableCell>
-        <TableCell>
-          <p className="text-xs text-muted-foreground">#{task.abbreviation}</p>
-          <p>{task.description}</p>
-        </TableCell>
-        <TableCell>
-          {task.dueDate
-            ? format(new Date(task.dueDate), "MMM d, yyyy")
-            : "No due date"}
-        </TableCell>
-        <TableCell>{""}</TableCell>
-        <TableCell>{assignedUser?.name}</TableCell>
-        <TableCell>{createdUser?.name}</TableCell>
-        <TableCell>
-          <Badge
-            className={`${getPriorityColor(
-              task.priorityType
-            )} hover:${getPriorityColor(task.priorityType)}`}
+    <Card
+      className={`overflow-hidden border-slate-200 ${
+        task.completed ? "bg-slate-50" : "bg-white"
+      } shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
+      onClick={handleCardClick}
+    >
+      <CardHeader className="p-4 pb-3 flex flex-row items-start justify-between gap-2 border-b border-slate-100">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Badge
+              variant="outline"
+              className="text-xs font-medium bg-indigo-100 border-indigo-200 text-indigo-700 px-2"
+            >
+              {task.abbreviation}
+            </Badge>
+
+            {task.completed ? (
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1 px-2 text-xs">
+                <CheckCircle className="h-3 w-3" /> Completed
+              </Badge>
+            ) : isOverdue ? (
+              <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1 px-2 text-xs">
+                <Clock className="h-3 w-3" /> Overdue
+              </Badge>
+            ) : task.status === "on_hold" ? (
+              <Badge className="bg-slate-100 text-slate-800 border-slate-200 flex items-center gap-1 px-2 text-xs">
+                <PauseCircle className="h-3 w-3" /> On Hold
+              </Badge>
+            ) : (
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 flex items-center gap-1 px-2 text-xs">
+                <Clock className="h-3 w-3" /> In Progress
+              </Badge>
+            )}
+
+            <Badge className={`px-2 text-xs ${priorityStyles.bg}`}>
+              {task.priorityType.toUpperCase()}
+            </Badge>
+          </div>
+
+          <h3
+            className={`font-medium text-base ${
+              task.completed ? "text-slate-500" : "text-slate-800"
+            } line-clamp-2`}
           >
-            {task.priorityType.toUpperCase()}
-          </Badge>
-        </TableCell>
-        <TableCell>
-          {task.createdAt
-            ? format(new Date(task.createdAt), "MMM d, yyyy")
-            : "No due date"}
-        </TableCell>
-      </TableRow>
-    </>
+            {task.description}
+          </h3>
+        </div>
+
+        <div className="flex gap-1">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
+                  onClick={(e) => toggleTaskCompletion(e)}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {task.completed ? "Mark as incomplete" : "Mark as complete"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-full"
+                  onClick={(e) => handleDeleteTask(e)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Delete task</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-4">
+        {task.remarks && (
+          <div className="mb-3 text-sm text-slate-600 line-clamp-2 flex gap-2 items-start">
+            <MessageSquare className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+            <p>{task.remarks}</p>
+          </div>
+        )}
+
+        {task.requestDateExtensionReason && (
+          <div className="mb-3 py-1.5 px-2.5 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div className="text-xs">
+              <p className="font-medium text-amber-700">Extension Requested</p>
+              <p className="text-amber-600 line-clamp-1">
+                {task.requestDateExtensionReason}
+              </p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+
+      <CardFooter className="p-4 pt-0 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Calendar
+              className={`h-3.5 w-3.5 ${
+                isOverdue ? "text-red-500" : "text-slate-400"
+              }`}
+            />
+            <span
+              className={`text-xs ${
+                isOverdue ? "text-red-600 font-medium" : "text-slate-500"
+              }`}
+            >
+              {formattedDueDate}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center">
+            <Avatar className="h-6 w-6 border border-white bg-indigo-100">
+              <AvatarFallback className="text-xs text-indigo-700">
+                {assignedUser?.name?.charAt(0) || "?"}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </div>
+      </CardFooter>
+    </Card>
   );
 }
 

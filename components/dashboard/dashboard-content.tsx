@@ -1,7 +1,22 @@
 "use client";
 
-import { CheckCircle, ListTodo } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CheckCircle,
+  ListTodo,
+  Clock,
+  AlertCircle,
+  Calendar,
+  CheckSquare,
+  BarChart3,
+  PieChart,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { TaskList } from "@/components/dashboard/task-list";
@@ -11,6 +26,7 @@ import { AnimatedCard } from "./animate-card";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
 type DashboardContentProps = {
   initialTasks: Task[];
@@ -23,6 +39,7 @@ type TaskStats = {
   completedTasks: number;
   pendingTasks: number;
   overdueTasks: number;
+  dateExtensionRequests: number;
 };
 
 export function DashboardContent({
@@ -40,6 +57,7 @@ export function DashboardContent({
     completedTasks: 0,
     pendingTasks: 0,
     overdueTasks: 0,
+    dateExtensionRequests: 0,
   });
 
   // Update tasks when initialTasks changes
@@ -47,7 +65,7 @@ export function DashboardContent({
     setTasks(initialTasks);
   }, [initialTasks]);
 
-  // Calculate stats from tasks instead of fetching from API
+  // Calculate stats from tasks
   useEffect(() => {
     const calculateStats = () => {
       const totalTasks = tasks.length;
@@ -57,12 +75,16 @@ export function DashboardContent({
         (task) =>
           !task.completed && task.dueDate && new Date(task.dueDate) < new Date()
       ).length;
+      const dateExtensionRequests = tasks.filter(
+        (task) => !!task.requestedDate && !!task.requestDateExtensionReason
+      ).length;
 
       setStats({
         totalTasks,
         completedTasks,
         pendingTasks,
         overdueTasks,
+        dateExtensionRequests,
       });
     };
 
@@ -132,124 +154,242 @@ export function DashboardContent({
     }
   };
 
+  // Calculate completion rate percentage
+  const completionRate =
+    stats.totalTasks > 0
+      ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
+      : 0;
+
   return (
-    <main className="container flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-      <DashboardHeader
-        heading="Dashboard"
-        text="Manage your tasks and monitor progress."
+    <main className="container flex flex-1 flex-col gap-8 p-4 md:gap-10 md:p-6">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full"
       >
-        <TaskButtonWrapper onSubmit={handleSubmit} />
-      </DashboardHeader>
+        <DashboardHeader
+          heading="Task Dashboard"
+          text="Manage your tasks, monitor progress, and track deadlines."
+        >
+          <TaskButtonWrapper onSubmit={handleSubmit} />
+        </DashboardHeader>
+      </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4 w-full">
         <AnimatedCard>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-              <ListTodo className="h-4 w-4 text-muted-foreground" />
+          <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4">
+              <CardTitle className="text-base font-medium text-slate-800">
+                Total Tasks
+              </CardTitle>
+              <div className="bg-blue-100 p-2 rounded-full">
+                <BarChart3 className="h-4 w-4 text-blue-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTasks}</div>
+            <CardContent className="p-4">
+              <div className="text-3xl font-bold text-slate-900">
+                {stats.totalTasks}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Tasks in the system</p>
             </CardContent>
           </Card>
         </AnimatedCard>
+
         <AnimatedCard delay={0.1}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4">
+              <CardTitle className="text-base font-medium text-slate-800">
+                Completed
+              </CardTitle>
+              <div className="bg-emerald-100 p-2 rounded-full">
+                <CheckSquare className="h-4 w-4 text-emerald-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.completedTasks}</div>
+            <CardContent className="p-4">
+              <div className="flex items-baseline gap-2">
+                <div className="text-3xl font-bold text-slate-900">
+                  {stats.completedTasks}
+                </div>
+                <div className="text-sm font-medium text-emerald-600">
+                  {completionRate}%
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Tasks completed</p>
             </CardContent>
           </Card>
         </AnimatedCard>
+
         <AnimatedCard delay={0.2}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <ListTodo className="h-4 w-4 text-muted-foreground" />
+          <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4">
+              <CardTitle className="text-base font-medium text-slate-800">
+                Pending
+              </CardTitle>
+              <div className="bg-amber-100 p-2 rounded-full">
+                <ListTodo className="h-4 w-4 text-amber-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingTasks}</div>
+            <CardContent className="p-4">
+              <div className="text-3xl font-bold text-slate-900">
+                {stats.pendingTasks}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Tasks in progress</p>
             </CardContent>
           </Card>
         </AnimatedCard>
+
         <AnimatedCard delay={0.3}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 p-4">
+              <CardTitle className="text-base font-medium text-slate-800">
+                Overdue
+              </CardTitle>
+              <div className="bg-red-100 p-2 rounded-full">
+                <Clock className="h-4 w-4 text-red-600" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.overdueTasks}</div>
+            <CardContent className="p-4">
+              <div className="text-3xl font-bold text-slate-900">
+                {stats.overdueTasks}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Tasks past deadline</p>
             </CardContent>
           </Card>
         </AnimatedCard>
       </div>
 
-      {/* Tabs */}
-      <Tabs
-        defaultValue="all"
-        className="mt-6"
-        onValueChange={(value) => setActiveTab(value as typeof activeTab)}
-      >
-        <TabsList>
-          <TabsTrigger value="all">All Tasks</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
-          <TabsTrigger value="date_extension">Date Extension</TabsTrigger>
-        </TabsList>
+      {/* Extensions Card */}
+      {stats.dateExtensionRequests > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="w-full"
+        >
+          <Card className="border-amber-200 bg-amber-50 shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+                <CardTitle className="text-base font-medium text-amber-800">
+                  Extension Requests
+                </CardTitle>
+              </div>
+              <div className="bg-white border border-amber-200 px-2.5 py-1 rounded-full">
+                <span className="text-amber-700 font-bold">
+                  {stats.dateExtensionRequests}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-amber-700 text-sm">
+                You have {stats.dateExtensionRequests} pending deadline
+                extension{" "}
+                {stats.dateExtensionRequests === 1 ? "request" : "requests"}{" "}
+                that need your review.
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
-        {/* Tab Content */}
-        <TabsContent value="all" className="mt-4">
-          <TaskList
-            users={users}
-            allTasks={tasks}
-            filter={undefined}
-            onSubmit={handleSubmit}
-            onTaskDelete={handleTaskDelete}
-          />
-        </TabsContent>
-        <TabsContent value="pending" className="mt-4">
-          <TaskList
-            users={users}
-            allTasks={tasks}
-            filter="pending"
-            onSubmit={handleSubmit}
-            onTaskDelete={handleTaskDelete}
-          />
-        </TabsContent>
-        <TabsContent value="completed" className="mt-4">
-          <TaskList
-            users={users}
-            allTasks={tasks}
-            filter="completed"
-            onSubmit={handleSubmit}
-            onTaskDelete={handleTaskDelete}
-          />
-        </TabsContent>
-        <TabsContent value="overdue" className="mt-4">
-          <TaskList
-            users={users}
-            allTasks={tasks}
-            filter="overdue"
-            onSubmit={handleSubmit}
-            onTaskDelete={handleTaskDelete}
-          />
-        </TabsContent>
-        <TabsContent value="date_extension" className="mt-4">
-          <TaskList
-            users={users}
-            allTasks={tasks}
-            filter="date_extension"
-            onSubmit={handleSubmit}
-            onTaskDelete={handleTaskDelete}
-          />
-        </TabsContent>
-      </Tabs>
+      {/* Tabs */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
+        className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-md w-full overflow-hidden"
+      >
+        <Tabs
+          defaultValue="all"
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as typeof activeTab)}
+          className="w-full"
+        >
+          <TabsList className="grid grid-cols-5 w-full h-auto max-w-full mx-auto mb-8 bg-slate-100 p-1.5 rounded-lg">
+            <TabsTrigger
+              value="all"
+              className="rounded-md py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm"
+            >
+              All Tasks
+            </TabsTrigger>
+            <TabsTrigger
+              value="pending"
+              className="rounded-md py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm"
+            >
+              Pending
+            </TabsTrigger>
+            <TabsTrigger
+              value="completed"
+              className="rounded-md py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
+            >
+              Completed
+            </TabsTrigger>
+            <TabsTrigger
+              value="overdue"
+              className="rounded-md py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
+            >
+              Overdue
+            </TabsTrigger>
+            <TabsTrigger
+              value="date_extension"
+              className="rounded-md py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm"
+            >
+              Extensions
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab Content */}
+          <div className="pb-2">
+            <TabsContent value="all" className="m-0 pt-2 w-full">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter={undefined}
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
+            <TabsContent value="pending" className="m-0 pt-2 w-full">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter="pending"
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
+            <TabsContent value="completed" className="m-0 pt-2 w-full">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter="completed"
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
+            <TabsContent value="overdue" className="m-0 pt-2 w-full">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter="overdue"
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
+            <TabsContent value="date_extension" className="m-0 pt-2 w-full">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter="date_extension"
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
+          </div>
+        </Tabs>
+      </motion.div>
     </main>
   );
 }

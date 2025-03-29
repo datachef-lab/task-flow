@@ -405,19 +405,19 @@ export default function TaskPage() {
   };
 
   return (
-    <div className="mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6 min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50">
+    <div className="mx-auto py-6 px-4 sm:px-6 lg:px-8 space-y-6 min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="rounded-xl bg-white shadow-lg p-6 border border-slate-100 max-w-7xl mx-auto"
+        className="rounded-xl bg-white shadow-xl p-6 border border-slate-100 max-w-7xl mx-auto"
       >
         {/* Header Section with Task Title and Actions */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4, delay: 0.2 }}
-          className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6 pb-6 border-b border-slate-100"
+          className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-6 pb-6 border-b border-slate-200"
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -428,7 +428,7 @@ export default function TaskPage() {
                 {task?.abbreviation}
               </Badge>
               {task?.completed ? (
-                <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1 hover:bg-green-200 px-2.5 py-0.5 rounded-full">
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 flex items-center gap-1 hover:bg-emerald-200 px-2.5 py-0.5 rounded-full">
                   <CheckCircle2 className="h-3 w-3" /> Completed
                 </Badge>
               ) : isOverdue ? (
@@ -441,7 +441,7 @@ export default function TaskPage() {
                 </Badge>
               )}
               <Badge
-                className={`px-2.5 py-0.5 rounded-full ${
+                className={`px-3 py-0.5 rounded-full ${
                   task?.priorityType === "high"
                     ? "bg-gradient-to-r from-red-500 to-pink-500 text-white"
                     : task?.priorityType === "medium"
@@ -449,18 +449,42 @@ export default function TaskPage() {
                     : "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
                 }`}
               >
-                {task?.priorityType.toUpperCase()}
+                {task?.priorityType.toUpperCase()} PRIORITY
               </Badge>
             </div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-800 leading-tight line-clamp-2 mb-1">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-slate-800 leading-tight mb-2">
               {task?.description}
             </h1>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+              <div className="flex items-center gap-1">
+                <UserIcon className="h-4 w-4 text-slate-400" />
+                <span>{assignedUser?.name}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4 text-slate-400" />
+                <span>
+                  {task?.dueDate
+                    ? format(new Date(task.dueDate), "PPP")
+                    : "No due date"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4 text-slate-400" />
+                <span>
+                  Updated{" "}
+                  {task?.updatedAt
+                    ? format(new Date(task.updatedAt), "PPP")
+                    : "Unknown"}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 mt-2 lg:mt-0 lg:flex-nowrap">
+
+          <div className="flex flex-wrap gap-2 mt-4 lg:mt-0 lg:flex-nowrap">
             {assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress &&
-              task.status !== "completed" &&
-              task.status == "on_hold" && (
+              !task.completed &&
+              task.status === "on_hold" && (
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -468,11 +492,12 @@ export default function TaskPage() {
                   <TaskButton type="edit" onSubmit={handleSubmit} task={task} />
                 </motion.div>
               )}
+            {/* Delete button - shown to assigned user or creator when not completed */}
             {(assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress ||
               createdUser?.email ===
                 clerkUser?.emailAddresses[0].emailAddress) &&
-              task.status !== "completed" && (
+              !task.completed && (
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -487,44 +512,69 @@ export default function TaskPage() {
                   </Button>
                 </motion.div>
               )}
+            {/* Extension request view button */}
             {(task.requestDateExtensionReason ||
-              task.isRequestDateExtensionApproved) && (
-              <motion.div>
-                {/* Create alert dialog for accepting or rejecting the request for date extension. use shadcn alert dialog */}
-                <AlertDialog>
-                  <AlertDialogTrigger>
-                    <Button variant="outline">View Request</Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Accept the reques for extension?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        <div className="mb-3">
-                          <p className="text-xs">{task.requestedDate}</p>
-                          <p className="text-black text-[17px]">
-                            {task.requestDateExtensionReason}
-                          </p>
-                        </div>
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel
-                        onClick={handleRejectRequestDateExtension}
+              task.isRequestDateExtensionApproved) &&
+              (createdUser?.email ===
+                clerkUser?.emailAddresses[0].emailAddress ||
+                assignedUser?.email ===
+                  clerkUser?.emailAddresses[0].emailAddress) && (
+                <motion.div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 h-10"
                       >
-                        Reject
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleApproveRequestDateExtension}
-                      >
-                        Accept
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </motion.div>
-            )}
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        View Extension Request
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-md">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl text-slate-800">
+                          Extension Request
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          <div className="mb-4 space-y-3">
+                            <div>
+                              <p className="text-xs text-slate-500">
+                                Requested New Due Date:
+                              </p>
+                              <p className="text-base font-medium text-slate-800">
+                                {format(
+                                  new Date(task.requestedDate || new Date()),
+                                  "PPP"
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Reason:</p>
+                              <p className="text-base text-slate-800 p-3 bg-slate-50 rounded-md border border-slate-200">
+                                {task.requestDateExtensionReason}
+                              </p>
+                            </div>
+                          </div>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel
+                          onClick={handleRejectRequestDateExtension}
+                          className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200"
+                        >
+                          Reject Request
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleApproveRequestDateExtension}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          Approve Extension
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </motion.div>
+              )}
           </div>
         </motion.div>
 
@@ -537,16 +587,20 @@ export default function TaskPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <Card className="border-slate-200 shadow-sm overflow-hidden bg-white hover:shadow-md transition-shadow">
-                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-3 border-b border-indigo-100 px-5 py-3">
-                  <CardTitle className="text-base text-slate-800 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-indigo-500" />
+              <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
+                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-indigo-500" />
                     Special Note
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-5">
-                  <p className="text-muted-foreground leading-relaxed">
-                    {task?.remarks || "Please write your remarks here (optional)"}.
+                <CardContent className="p-6">
+                  <p
+                    className={`leading-relaxed ${
+                      task?.remarks ? "text-slate-700" : "text-slate-400 italic"
+                    }`}
+                  >
+                    {task?.remarks || "No special notes for this task."}
                   </p>
                 </CardContent>
               </Card>
@@ -558,18 +612,18 @@ export default function TaskPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
-              <Card className="border-slate-200 shadow-sm bg-white hover:shadow-md transition-shadow">
-                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-3 border-b border-indigo-100 px-5 py-3">
-                  <CardTitle className="text-base text-slate-800 flex items-center gap-2">
-                    <Paperclip className="h-4 w-4 text-indigo-500" />
+              <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
+                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                    <Paperclip className="h-5 w-5 text-indigo-500" />
                     Attachments
                   </CardTitle>
-                  <CardDescription className="text-indigo-500 text-xs">
+                  <CardDescription className="text-slate-500 text-sm mt-1">
                     Documents and resources for this task
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {attachments.length > 0 ? (
                       attachments.map((attachment, index) => (
                         <motion.div
@@ -578,11 +632,10 @@ export default function TaskPage() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: index * 0.1 }}
                           whileHover={{
-                            scale: 1.01,
-                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
-                            borderColor: "#a5b4fc",
+                            scale: 1.02,
+                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
                           }}
-                          className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all"
+                          className="flex items-center gap-3 p-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm"
                         >
                           {getFileIcon(attachment.type)}
                           <div className="flex-1 min-w-0">
@@ -596,12 +649,12 @@ export default function TaskPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
+                            className="h-8 w-8 p-0 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              width="14"
-                              height="14"
+                              width="16"
+                              height="16"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
@@ -617,13 +670,19 @@ export default function TaskPage() {
                         </motion.div>
                       ))
                     ) : (
-                      <div className="col-span-full flex flex-col items-center justify-center p-8 text-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
-                        <Paperclip className="h-10 w-10 text-slate-300 mb-2" />
-                        <p className="text-slate-500">
-                          No attachments for this task
+                      <div className="col-span-full flex flex-col items-center justify-center p-10 text-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
+                        <Paperclip className="h-12 w-12 text-slate-300 mb-3" />
+                        <p className="text-slate-600 font-medium mb-1">
+                          No attachments yet
                         </p>
-                        <Button variant="link" className="mt-2 text-indigo-600">
-                          Upload Files
+                        <p className="text-slate-500 text-sm mb-4">
+                          Upload files to share with the team
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="mt-2 bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                        >
+                          <Paperclip className="w-4 h-4 mr-2" /> Upload Files
                         </Button>
                       </div>
                     )}
@@ -634,150 +693,6 @@ export default function TaskPage() {
           </div>
 
           <div className="space-y-6">
-            {/* Task Details Section */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <Card className="border-slate-200 shadow-sm bg-white overflow-hidden hover:shadow-md transition-shadow">
-                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-3 border-b border-indigo-100 px-5 py-3">
-                  <CardTitle className="text-base text-slate-800">
-                    Task Details
-                  </CardTitle>
-                  <CardDescription className="text-indigo-500 text-xs">
-                    Key information about this task
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-5">
-                  <div className="space-y-3">
-                    <motion.div
-                      whileHover={{
-                        y: -2,
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05)",
-                      }}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-100 shadow-sm"
-                    >
-                      <div className="bg-indigo-100 rounded-full p-2 flex items-center justify-center">
-                        <UserIcon className="w-4 h-4 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-indigo-500">
-                          Created by
-                        </p>
-                        <p className="font-medium text-slate-800 text-sm">
-                          {createdUser?.name}
-                        </p>
-                      </div>
-                    </motion.div>
-
-                    <motion.div
-                      whileHover={{
-                        y: -2,
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05)",
-                      }}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-100 shadow-sm"
-                    >
-                      <div className="bg-purple-100 rounded-full p-2 flex items-center justify-center">
-                        <UserIcon className="w-4 h-4 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-purple-500">
-                          Assignee
-                        </p>
-                        <p className="font-medium text-slate-800 text-sm">
-                          {assignedUser?.name}
-                        </p>
-                      </div>
-                    </motion.div>
-
-                    <motion.div
-                      whileHover={{
-                        y: -2,
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05)",
-                      }}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-100 shadow-sm"
-                    >
-                      <div
-                        className={`${
-                          isOverdue ? "bg-red-100" : "bg-green-100"
-                        } rounded-full p-2 flex items-center justify-center`}
-                      >
-                        <Calendar
-                          className={`w-4 h-4 ${
-                            isOverdue ? "text-red-600" : "text-green-600"
-                          }`}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-green-500">
-                          Due Date
-                        </p>
-                        <p
-                          className={`font-medium text-sm ${
-                            isOverdue ? "text-red-600" : "text-slate-800"
-                          }`}
-                        >
-                          {task?.dueDate
-                            ? format(new Date(task.dueDate), "PPP")
-                            : "Not set"}
-                          {isOverdue && (
-                            <span className="text-red-500 text-xs ml-2 font-medium">
-                              (Overdue)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </motion.div>
-
-                    <motion.div
-                      whileHover={{
-                        y: -2,
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05)",
-                      }}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-100 shadow-sm"
-                    >
-                      <div className="bg-amber-100 rounded-full p-2 flex items-center justify-center">
-                        <CalendarClock className="w-4 h-4 text-amber-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-amber-500">
-                          Created
-                        </p>
-                        <p className="font-medium text-slate-800 text-sm">
-                          {task?.createdAt
-                            ? format(new Date(task.createdAt), "PPP")
-                            : "Unknown"}
-                        </p>
-                      </div>
-                    </motion.div>
-
-                    <motion.div
-                      whileHover={{
-                        y: -2,
-                        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.05)",
-                      }}
-                      className="flex items-center gap-3 p-2.5 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-100 shadow-sm"
-                    >
-                      <div className="bg-cyan-100 rounded-full p-2 flex items-center justify-center">
-                        <Clock className="w-4 h-4 text-cyan-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-cyan-500">
-                          Last Updated
-                        </p>
-                        <p className="font-medium text-slate-800 text-sm">
-                          {task?.updatedAt
-                            ? format(new Date(task.updatedAt), "PPP")
-                            : "Unknown"}
-                        </p>
-                      </div>
-                    </motion.div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
             {/* Actions Section */}
             {assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress && (
@@ -786,21 +701,56 @@ export default function TaskPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
               >
-                <Card className="border-slate-200 shadow-sm bg-white overflow-hidden hover:shadow-md transition-shadow">
-                  <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-3 border-b border-indigo-100 px-5 py-3">
-                    <CardTitle className="text-base text-slate-800">
-                      Actions
+                <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
+                    <CardTitle className="text-lg text-slate-800">
+                      Task Actions
                     </CardTitle>
-                    <CardDescription className="text-indigo-500 text-xs">
-                      Available task operations
+                    <CardDescription className="text-slate-500 text-sm mt-1">
+                      Manage task status and delegation
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-5">
-                    <div className="space-y-3">
-                      {!task.completed && (
+                  <CardContent className="p-6">
+                    {task.completed ? (
+                      <div className="space-y-4">
+                        <div className="rounded-lg p-4 bg-emerald-50 border border-emerald-200 text-emerald-800">
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle className="h-5 w-5 text-emerald-600" />
+                            <h3 className="font-medium">Task Completed</h3>
+                          </div>
+                          <p className="text-sm">
+                            This task has been marked as complete. You can mark
+                            it as incomplete if needed.
+                          </p>
+                        </div>
+
                         <motion.div
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
+                          className="overflow-hidden rounded-lg shadow-sm"
+                        >
+                          <Button
+                            onClick={() => {
+                              const newTask: Task = { ...task };
+                              newTask.completed = false;
+                              newTask.status = null;
+                              setTask(newTask);
+                              handleUpdateTask(newTask);
+                            }}
+                            className="w-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium"
+                          >
+                            <Repeat className="w-5 h-5 mr-2" />
+                            Mark as Incomplete
+                          </Button>
+                        </motion.div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* On hold / Resume task button */}
+                        <motion.div
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="overflow-hidden rounded-lg shadow-sm"
                         >
                           <Button
                             onClick={() => {
@@ -813,257 +763,362 @@ export default function TaskPage() {
                             }}
                             className={`w-full ${
                               task.status === "on_hold"
-                                ? "bg-gradient-to-r from-orange-500 to-orange-700 hover:from-orange-600 hover:to-orange-800 text-white"
-                                : "bg-red-500 text-white border hover:bg-red-600"
-                            } shadow-md flex items-center justify-center h-10`}
+                                ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
+                                : "bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white"
+                            } shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium`}
                           >
-                            <PauseCircle className="w-5 h-5 mr-2" />
-                            On Hold
+                            {task.status === "on_hold" ? (
+                              <>
+                                <Repeat className="w-5 h-5 mr-2" />
+                                Resume Task
+                              </>
+                            ) : (
+                              <>
+                                <PauseCircle className="w-5 h-5 mr-2" />
+                                Put On Hold
+                              </>
+                            )}
                           </Button>
                         </motion.div>
-                      )}
-                      {
+
+                        {/* Mark as complete button */}
                         <motion.div
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
+                          className="overflow-hidden rounded-lg shadow-sm"
                         >
                           <Button
                             onClick={() => {
                               const newTask: Task = { ...task };
-                              newTask.completed = !newTask.completed;
-                              newTask.status = newTask.completed
-                                ? "completed"
-                                : null;
+                              newTask.completed = true;
+                              newTask.status = "completed";
                               setTask(newTask);
                               handleUpdateTask(newTask);
                             }}
-                            className={`w-full ${
-                              task.completed
-                                ? "bg-gradient-to-r from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white"
-                                : "border bg-transparent text-black hover:bg-slate-50"
-                            } shadow-md flex items-center justify-center h-10`}
+                            className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium"
                           >
                             <CheckCircle className="w-5 h-5 mr-2" />
-                            {task.completed ? "Completed" : "Marks as complete"}
+                            Mark as Complete
                           </Button>
                         </motion.div>
-                      }
 
-                      {/* <motion.div
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <Dialog>
-                          <DialogTrigger className="w-full">
-                        
-
-                            <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-md flex items-center justify-center h-10">
-                              <Repeat className="w-5 h-5 mr-2" />
-                              Re-delegate
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Update Task Status</DialogTitle>
-                              <DialogDescription>
-                                <div className="space-y-2">
-                                  <Label htmlFor="status">Status</Label>
+                        {/* Re-delegate task - only available if task is not on hold */}
+                        {task.status !== "on_hold" && (
+                          <motion.div
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="overflow-hidden rounded-lg shadow-sm"
+                          >
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium">
+                                  <Forward className="w-5 h-5 mr-2" />
+                                  Re-delegate Task
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle className="text-xl text-slate-800">
+                                    Re-delegate Task
+                                  </DialogTitle>
+                                  <DialogDescription className="text-slate-500 mt-2">
+                                    Assign this task to another team member
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <Label
+                                    htmlFor="assignedUserId"
+                                    className="text-slate-700"
+                                  >
+                                    Select Team Member
+                                  </Label>
                                   <Select
-                                    name="status"
-                                    value={
-                                      task.status as "on_hold" | "completed"
-                                    }
+                                    name="assignedUserId"
+                                    value={task.assignedUserId?.toString()}
                                     onValueChange={(value) => {
                                       const newTask: Task = {
                                         ...task,
-                                        completed: value === "completed",
-                                        status: value as
-                                          | "completed"
-                                          | "on_hold",
+                                        assignedUserId: Number(value),
                                       };
                                       setTask(newTask);
                                       handleUpdateTask(newTask);
                                     }}
                                   >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select status" />
+                                    <SelectTrigger className="w-full h-11 bg-white border-slate-300">
+                                      <SelectValue
+                                        placeholder="Select a team member"
+                                        className="text-slate-700"
+                                      />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="on_hold">
-                                        On Hold
-                                      </SelectItem>
-                                      <SelectItem value="completed">
-                                        Completed
-                                      </SelectItem>
+                                    <SelectContent className="max-h-60">
+                                      {users?.map((user) => (
+                                        <SelectItem
+                                          key={user.id}
+                                          value={user.id.toString()}
+                                          className="cursor-pointer"
+                                        >
+                                          <div className="flex items-center">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-medium mr-2">
+                                              {user.name.charAt(0)}
+                                            </div>
+                                            {user.name}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
-                              </DialogDescription>
-                            </DialogHeader>
-                          </DialogContent>
-                        </Dialog>
-                      </motion.div> */}
+                              </DialogContent>
+                            </Dialog>
+                          </motion.div>
+                        )}
 
-                      {/* Forward task */}
-                      {task.status === "on_hold" && (
-                        <motion.div
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <Dialog>
-                            <DialogTrigger className="w-full">
-                              <Button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9">
-                                <Forward className="w-4 h-4 mr-2" />
-                                Re-delegate
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Forward Task...</DialogTitle>
-                                <DialogDescription>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="assignedUserId">
-                                      Assign To
-                                    </Label>
-                                    <Select
-                                      name="assignedUserId"
-                                      value={task.assignedUserId?.toString()}
-                                      onValueChange={(value) => {
-                                        const newTask: Task = {
-                                          ...task,
-                                          assignedUserId: Number(value),
-                                        };
-                                        setTask(newTask);
-                                        handleUpdateTask(newTask);
-                                      }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select user" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {users?.map((user) => (
-                                          <SelectItem
-                                            key={user.id}
-                                            value={user.id.toString()}
-                                          >
-                                            {user.name}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </DialogDescription>
-                              </DialogHeader>
-                            </DialogContent>
-                          </Dialog>
-                        </motion.div>
-                      )}
-
-                      {task.completed == false &&
-                        task.status !== "completed" && (
+                        {/* Request deadline extension - only if not on hold and no existing request */}
+                        {task.status !== "on_hold" && (
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
+                            className="overflow-hidden rounded-lg shadow-sm"
                           >
-                            {/* <Button
-                            variant="outline"
-                            onClick={() => setIsEditing(!isEditing)}
-                            disabled={!!task.requestDateExtensionReason}
-                            className="w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-sm h-9"
-                          >
-                            <AlertCircle className="w-4 h-4 mr-2" />
-                            Extension Required
-                          </Button> */}
-
                             <Button
                               variant="outline"
                               onClick={() => setIsEditing((prev) => !prev)}
-                              disabled={
-                                !!task.requestDateExtensionReason ||
-                                task.status !== "on_hold"
-                              }
-                              className="w-full border-red-400 bg-red-50 text-red-700 hover:bg-red-100 shadow-md flex items-center justify-center h-10"
+                              disabled={!!task.requestDateExtensionReason}
+                              className={`w-full border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium ${
+                                !!task.requestDateExtensionReason &&
+                                "opacity-50 cursor-not-allowed"
+                              }`}
                             >
                               <AlertCircle className="w-5 h-5 mr-2" />
-                              Extension Required
+                              {!!task.requestDateExtensionReason
+                                ? "Extension Already Requested"
+                                : "Request Deadline Extension"}
                             </Button>
                           </motion.div>
                         )}
-                    </div>
-
-                    {(isEditing || task.requestDateExtensionReason) && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        transition={{ duration: 0.3 }}
-                        className="mt-4 space-y-3 p-4 rounded-lg border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner"
-                      >
-                        <h3 className="font-medium text-amber-800 flex items-center gap-2 text-sm">
-                          <AlertCircle className="h-4 w-4" />
-                          Request Due Date Extension
-                        </h3>
-                        <div className="space-y-3">
-                          <div>
-                            <Label
-                              htmlFor="newDueDate"
-                              className="text-amber-800 mb-1 block text-xs"
-                            >
-                              New Due Date
-                            </Label>
-                            <Input
-                              id="newDueDate"
-                              type="date"
-                              value={task.requestedDate || newDueDate}
-                              onChange={(e) => setNewDueDate(e.target.value)}
-                              className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm h-8 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label
-                              htmlFor="extensionReason"
-                              className="text-amber-800 mb-1 block text-xs"
-                            >
-                              Reason for Extension
-                            </Label>
-                            <Textarea
-                              id="extensionReason"
-                              value={
-                                task.requestDateExtensionReason ||
-                                extensionReason
-                              }
-                              onChange={(e) => {
-                                setExtensionReason(e.target.value);
-                                setTask((prev) => ({
-                                  ...prev!,
-                                  requestDateExtensionReason: e.target.value,
-                                }));
-                              }}
-                              placeholder="Please explain why you need an extension..."
-                              className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm min-h-20 text-sm"
-                            />
-                          </div>
-                        </div>
-                        <motion.div
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <Button
-                            onClick={handleRequestExtension}
-                            disabled={
-                              //   !!task.requestDateExtensionReason ||
-                              task.completed == true
-                            }
-                            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm h-9"
-                          >
-                            Submit Request
-                          </Button>
-                        </motion.div>
-                      </motion.div>
+                      </div>
                     )}
+
+                    {/* Extension request form */}
+                    {isEditing &&
+                      !task.requestDateExtensionReason &&
+                      !task.completed &&
+                      task.status !== "on_hold" && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          transition={{ duration: 0.3 }}
+                          className="mt-6 space-y-4 p-5 rounded-lg border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner"
+                        >
+                          <h3 className="font-medium text-amber-800 flex items-center gap-2 text-base">
+                            <AlertCircle className="h-5 w-5" />
+                            Request Due Date Extension
+                          </h3>
+                          <div className="space-y-4">
+                            <div>
+                              <Label
+                                htmlFor="newDueDate"
+                                className="text-amber-800 mb-1.5 block text-sm font-medium"
+                              >
+                                New Due Date
+                              </Label>
+                              <Input
+                                id="newDueDate"
+                                type="date"
+                                value={newDueDate}
+                                onChange={(e) => setNewDueDate(e.target.value)}
+                                className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm h-10 text-sm w-full"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor="extensionReason"
+                                className="text-amber-800 mb-1.5 block text-sm font-medium"
+                              >
+                                Reason for Extension
+                              </Label>
+                              <Textarea
+                                id="extensionReason"
+                                value={extensionReason}
+                                onChange={(e) =>
+                                  setExtensionReason(e.target.value)
+                                }
+                                placeholder="Please explain why you need more time to complete this task..."
+                                className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm min-h-[120px] text-sm w-full"
+                              />
+                            </div>
+                          </div>
+                          <motion.div
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="pt-2"
+                          >
+                            <Button
+                              onClick={handleRequestExtension}
+                              disabled={!newDueDate || !extensionReason}
+                              className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md h-11 font-medium ${
+                                (!newDueDate || !extensionReason) &&
+                                "opacity-50 cursor-not-allowed"
+                              }`}
+                            >
+                              <Calendar className="w-5 h-5 mr-2" />
+                              Submit Extension Request
+                            </Button>
+                          </motion.div>
+                        </motion.div>
+                      )}
                   </CardContent>
                 </Card>
               </motion.div>
             )}
+
+            {/* Task Details Section */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
+                  <CardTitle className="text-lg text-slate-800">
+                    Task Details
+                  </CardTitle>
+                  <CardDescription className="text-slate-500 text-sm mt-1">
+                    Key information about this task
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <motion.div
+                      whileHover={{
+                        y: -2,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.05)",
+                      }}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-200 shadow-sm"
+                    >
+                      <div className="bg-indigo-100 rounded-full p-2.5 flex items-center justify-center">
+                        <UserIcon className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-indigo-500 mb-0.5">
+                          Created by
+                        </p>
+                        <p className="font-medium text-slate-800">
+                          {createdUser?.name || "Unknown"}
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{
+                        y: -2,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.05)",
+                      }}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-200 shadow-sm"
+                    >
+                      <div className="bg-purple-100 rounded-full p-2.5 flex items-center justify-center">
+                        <UserIcon className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-purple-500 mb-0.5">
+                          Assignee
+                        </p>
+                        <p className="font-medium text-slate-800">
+                          {assignedUser?.name || "Unassigned"}
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{
+                        y: -2,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.05)",
+                      }}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-200 shadow-sm"
+                    >
+                      <div
+                        className={`${
+                          isOverdue ? "bg-red-100" : "bg-emerald-100"
+                        } rounded-full p-2.5 flex items-center justify-center`}
+                      >
+                        <Calendar
+                          className={`w-5 h-5 ${
+                            isOverdue ? "text-red-600" : "text-emerald-600"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <p
+                          className={`text-xs font-medium ${
+                            isOverdue ? "text-red-500" : "text-emerald-500"
+                          } mb-0.5`}
+                        >
+                          Due Date
+                        </p>
+                        <p
+                          className={`font-medium ${
+                            isOverdue ? "text-red-600" : "text-slate-800"
+                          }`}
+                        >
+                          {task?.dueDate
+                            ? format(new Date(task.dueDate), "PPP")
+                            : "Not set"}
+                          {isOverdue && (
+                            <span className="text-red-500 text-xs ml-2 font-bold bg-red-50 px-1.5 py-0.5 rounded">
+                              OVERDUE
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{
+                        y: -2,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.05)",
+                      }}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-200 shadow-sm"
+                    >
+                      <div className="bg-amber-100 rounded-full p-2.5 flex items-center justify-center">
+                        <CalendarClock className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-amber-500 mb-0.5">
+                          Created
+                        </p>
+                        <p className="font-medium text-slate-800">
+                          {task?.createdAt
+                            ? format(new Date(task.createdAt), "PPP")
+                            : "Unknown"}
+                        </p>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      whileHover={{
+                        y: -2,
+                        boxShadow: "0 8px 16px rgba(0, 0, 0, 0.05)",
+                      }}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-gradient-to-r from-slate-50 to-white border border-slate-200 shadow-sm"
+                    >
+                      <div className="bg-cyan-100 rounded-full p-2.5 flex items-center justify-center">
+                        <Clock className="w-5 h-5 text-cyan-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-cyan-500 mb-0.5">
+                          Last Updated
+                        </p>
+                        <p className="font-medium text-slate-800">
+                          {task?.updatedAt
+                            ? format(new Date(task.updatedAt), "PPP")
+                            : "Unknown"}
+                        </p>
+                      </div>
+                    </motion.div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
         </div>
       </motion.div>
