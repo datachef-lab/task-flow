@@ -7,7 +7,11 @@ import { DashboardContent } from "./dashboard-content";
 type DashboardWrapperProps = {
   tasks: Task[];
   users: User[];
-  handleSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
+  handleSubmit: (
+    type: "add" | "edit",
+    task: Task,
+    files?: FileList
+  ) => Promise<void>;
 };
 
 export default function DashboardWrapper({

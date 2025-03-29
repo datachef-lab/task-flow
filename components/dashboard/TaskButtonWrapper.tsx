@@ -5,7 +5,11 @@ import TaskButton from "./task-button";
 import { Task } from "@/db/schema";
 
 type TaskButtonWrapperProps = {
-  onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
+  onSubmit: (
+    type: "add" | "edit",
+    task: Task,
+    files?: FileList
+  ) => Promise<void>;
 };
 
 export default function TaskButtonWrapper({

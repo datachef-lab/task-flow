@@ -163,23 +163,31 @@ async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ n
 
 export async function createTask(givenTask: Task, files?: FileList) {
     const { id, ...props } = givenTask;
-    console.log("in creat task,", props);
-    // Handle file uploads if provided
-    // let savedFiles: Array<{ name: string; path: string; type: string }> = [];
-    // try {
-    //     if (files && files.length > 0) {
-    //         savedFiles = await handleTaskFiles(givenTask.id, Array.from(files));
-    //     }
+    console.log("in create task,", props);
 
-    // } catch (error) {
-    //     console.log(error)
-    // }
     try {
         const abbreviation = await getAbbreviation(givenTask.priorityType);
         const [newTask] = await db
             .insert(taskModel)
             .values({ ...props, abbreviation })
             .returning();
+
+        // Handle file uploads if provided
+        let savedFiles: Array<{ name: string; path: string; type: string }> = [];
+        if (files && files.length > 0) {
+            savedFiles = await handleTaskFiles(newTask.id, Array.from(files));
+
+            // Update the task with file information
+            const [updatedTask] = await db
+                .update(taskModel)
+                .set({ files: savedFiles })
+                .where(eq(taskModel.id, newTask.id))
+                .returning();
+
+            if (updatedTask) {
+                newTask.files = updatedTask.files;
+            }
+        }
 
         await createActivityLog({
             actionType: "create",
@@ -207,33 +215,46 @@ export async function createTask(givenTask: Task, files?: FileList) {
             newTask.dueDate?.toString() || 'default_date',
         ], "task_assigned");
 
-
         return newTask;
     } catch (error) {
-        console.log(error)
+        console.error("Error creating task:", error);
     }
-
-
 
     return null;
 }
 
 export async function updateTask(id: number, givenTask: Task, files?: FileList) {
-    console.log("in updatedTask(), id:", id, "givenTask:", givenTask);
+    console.log("updateTask called with id:", id, "and task:", givenTask);
+    
     const foundTask = await getTaskById(id);
 
     if (!foundTask) {
+        console.error(`Task with ID ${id} not found for update`);
         return null;
     }
 
     const { id: tmpId, createdAt, updatedAt, ...props } = givenTask;
 
     // Handle file uploads if provided
-    let savedFiles: Array<{ name: string; path: string; type: string }> = (foundTask.files || []) as Array<{ name: string; path: string; type: string }>;
+    let savedFiles: Array<{ name: string; path: string; type: string; size?: string }> = 
+        (foundTask.files || []) as Array<{ name: string; path: string; type: string; size?: string }>;
+    
+    console.log("Current files:", savedFiles);
+    
     if (files && files.length > 0) {
+        console.log(`Processing ${files.length} new files in updateTask`);
         const newFiles = await handleTaskFiles(id, Array.from(files));
         savedFiles = [...savedFiles, ...newFiles];
+        console.log("Files after adding new uploads:", savedFiles);
     }
+
+    // If task update includes files property, use it instead
+    if (props.files) {
+        console.log("Task update includes files property, using it directly");
+        savedFiles = props.files as any[];
+    }
+
+    console.log("Final files array for update:", savedFiles);
 
     let updatedTask: Task | null = null;
 
@@ -244,13 +265,13 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
             .where(eq(taskModel.id, id))
             .returning();
 
-        console.log("updatedTask:", savedTask);
+        console.log("Updated task in database:", savedTask);
         updatedTask = savedTask;
 
     } catch (error) {
-        console.log(error)
+        console.error("Error updating task in database:", error);
+        return null;
     }
-
 
     await createActivityLog({
         actionType: "update",

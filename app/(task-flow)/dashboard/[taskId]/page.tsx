@@ -80,6 +80,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Ensure the TaskFile interface is properly defined at the top of the file
+interface TaskFile {
+  name: string;
+  path: string;
+  type: string;
+  size?: string;
+}
+
 // Add interface for file attachment
 interface FileAttachment {
   name: string;
@@ -164,29 +172,76 @@ export default function TaskPage() {
       setAssignedUser(data as User);
     }
   };
-  // Add dummy attachments for UI demonstration
-  const [attachments, setAttachments] = useState<FileAttachment[]>([
-    {
-      name: "requirements-doc.pdf",
-      type: "pdf",
-      size: "3.2 MB",
-    },
-    {
-      name: "project-timeline.xlsx",
-      type: "spreadsheet",
-      size: "1.8 MB",
-    },
-    {
-      name: "design-mockup.png",
-      type: "image",
-      size: "4.5 MB",
-    },
-    {
-      name: "implementation-notes.md",
-      type: "markdown",
-      size: "645 KB",
-    },
-  ]);
+
+  // Function to identify file type from extension
+  const getFileType = (fileName: string): string => {
+    const extension = fileName.split(".").pop()?.toLowerCase() || "";
+
+    if (["pdf"].includes(extension)) return "pdf";
+    if (["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(extension))
+      return "image";
+    if (["doc", "docx", "txt", "md", "rtf"].includes(extension)) return "text";
+    if (["xls", "xlsx", "csv"].includes(extension)) return "spreadsheet";
+    if (
+      [
+        "js",
+        "ts",
+        "jsx",
+        "tsx",
+        "html",
+        "css",
+        "java",
+        "py",
+        "c",
+        "cpp",
+      ].includes(extension)
+    )
+      return "code";
+
+    return "unknown";
+  };
+
+  // Function to download a file
+  const handleFileDownload = async (filePath: string, fileName: string) => {
+    try {
+      console.log("Attempting to download file:", { filePath, fileName });
+
+      // Show loading toast
+      const toastId = toast.loading(`Starting download for ${fileName}...`);
+
+      // Handle file path - original format is typically: /documents/{taskId}/{fileName}
+      // For the download API we want to pass the relative path
+      if (!filePath) {
+        toast.error("Invalid file path", { id: toastId });
+        return;
+      }
+
+      // Create a direct path to the file in the task's directory
+      // Using the download API which accepts path relative to process.cwd()
+      // This is more reliable than trying to parse the existing path
+      const downloadPath = `documents/${taskId}/${fileName}`;
+      console.log("Using download path:", downloadPath);
+
+      // Trigger the download by opening the URL in a new tab
+      const downloadUrl = `/api/download?path=${encodeURIComponent(
+        downloadPath
+      )}`;
+      console.log("Download URL:", downloadUrl);
+
+      // Use window.open for direct download
+      window.open(downloadUrl, "_blank");
+
+      // Update the toast to success
+      toast.success(`Download started for ${fileName}`, { id: toastId });
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to download file. Please try again."
+      );
+    }
+  };
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -271,9 +326,9 @@ export default function TaskPage() {
       if (!response.ok) {
         throw new Error("Failed to delete task");
       }
-    toast.success("Task deleted successfully");
+      toast.success("Task deleted successfully");
       router.refresh();
-    router.push("/dashboard");
+      router.push("/dashboard");
     } catch (error) {
       console.error("Error deleting task:", error);
       toast.error("Failed to delete task");
@@ -481,10 +536,11 @@ export default function TaskPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 mt-4 lg:mt-0 lg:flex-nowrap">
+            {/* Edit button - only shown when user is the assignee AND task is not on hold AND not completed */}
             {assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress &&
               !task.completed &&
-              task.status === "on_hold" && (
+              task.status !== "on_hold" && (
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -502,14 +558,14 @@ export default function TaskPage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-            <Button
-              variant="outline"
-              onClick={handleDelete}
+                  <Button
+                    variant="outline"
+                    onClick={handleDelete}
                     className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors shadow-sm h-10"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </Button>
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
                 </motion.div>
               )}
             {/* Extension request view button */}
@@ -581,6 +637,102 @@ export default function TaskPage() {
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {/* On-hold Reason Section - visible to all users */}
+            {task.status === "on_hold" && task.onHoldReason && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                <Card className="overflow-hidden border-amber-200 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="bg-gradient-to-r from-amber-50 to-white pb-4 border-b border-amber-200 px-6 py-4">
+                    <CardTitle className="text-lg text-amber-800 flex items-center gap-2">
+                      <PauseCircle className="h-5 w-5 text-amber-600" />
+                      Task On Hold
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <p className="text-amber-800 font-medium mb-2">Reason:</p>
+                    <p className="leading-relaxed text-slate-700 p-3 bg-amber-50 rounded-md border border-amber-100">
+                      {task.onHoldReason}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Extension Request Section - visible to all users */}
+            {task.requestDateExtensionReason && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.35 }}
+              >
+                <Card className="overflow-hidden border-amber-200 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="bg-gradient-to-r from-amber-50 to-white pb-4 border-b border-amber-200 px-6 py-4">
+                    <CardTitle className="text-lg text-amber-800 flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-amber-600" />
+                      Extension Requested
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-amber-800 font-medium mb-1">
+                          Current Due Date:
+                        </p>
+                        <p className="text-slate-700 font-medium">
+                          {task?.dueDate
+                            ? format(new Date(task.dueDate), "PPP")
+                            : "Not set"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-amber-800 font-medium mb-1">
+                          Requested Due Date:
+                        </p>
+                        <p className="text-slate-700 font-medium">
+                          {task?.requestedDate
+                            ? format(new Date(task.requestedDate), "PPP")
+                            : "Not set"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-amber-800 font-medium mb-1">
+                          Reason for Extension:
+                        </p>
+                        <p className="leading-relaxed text-slate-700 p-3 bg-amber-50 rounded-md border border-amber-100">
+                          {task.requestDateExtensionReason}
+                        </p>
+                      </div>
+
+                      {/* Only show approve/reject buttons to the task creator */}
+                      {createdUser?.email ===
+                        clerkUser?.emailAddresses[0].emailAddress && (
+                        <div className="flex gap-3 mt-2">
+                          <Button
+                            onClick={handleApproveRequestDateExtension}
+                            className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-sm"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Approve
+                          </Button>
+                          <Button
+                            onClick={handleRejectRequestDateExtension}
+                            variant="outline"
+                            className="flex-1 border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2" />
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
             {/* Remarks Section */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -589,11 +741,11 @@ export default function TaskPage() {
             >
               <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
                 <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
-                <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-indigo-500" />
                     Special Note
-                </CardTitle>
-              </CardHeader>
+                  </CardTitle>
+                </CardHeader>
                 <CardContent className="p-6">
                   <p
                     className={`leading-relaxed ${
@@ -602,8 +754,8 @@ export default function TaskPage() {
                   >
                     {task?.remarks || "No special notes for this task."}
                   </p>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
             </motion.div>
 
             {/* Attachments Section */}
@@ -614,60 +766,240 @@ export default function TaskPage() {
             >
               <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
                 <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
-                <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
                     <Paperclip className="h-5 w-5 text-indigo-500" />
-                  Attachments
-                </CardTitle>
+                    Attachments
+                  </CardTitle>
                   <CardDescription className="text-slate-500 text-sm mt-1">
                     Documents and resources for this task
                   </CardDescription>
-              </CardHeader>
+                </CardHeader>
                 <CardContent className="p-6">
+                  {/* File Upload Section - only shown to assignee when task is not completed and not on hold */}
+                  {assignedUser?.email ===
+                    clerkUser?.emailAddresses[0].emailAddress &&
+                    !task.completed &&
+                    task.status !== "on_hold" && (
+                      <div className="mb-6">
+                        <form
+                          onSubmit={async (e) => {
+                            e.preventDefault();
+                            const fileInput = e.currentTarget.querySelector(
+                              'input[type="file"]'
+                            ) as HTMLInputElement;
+                            if (!fileInput?.files?.length) {
+                              toast.error(
+                                "Please select at least one file to upload"
+                              );
+                              return;
+                            }
+
+                            const formData = new FormData();
+                            for (let i = 0; i < fileInput.files.length; i++) {
+                              formData.append("files", fileInput.files[i]);
+                            }
+
+                            const toastId = toast.loading("Uploading files...");
+                            try {
+                              const response = await fetch(
+                                `/api/tasks/${taskId}/files`,
+                                {
+                                  method: "POST",
+                                  body: formData,
+                                }
+                              );
+
+                              if (!response.ok) {
+                                const errorData = await response.json();
+                                throw new Error(
+                                  `Upload failed: ${
+                                    errorData.error || response.statusText
+                                  }`
+                                );
+                              }
+
+                              const result = await response.json();
+                              toast.success("Files uploaded successfully", {
+                                id: toastId,
+                              });
+
+                              // Update the task state with new files
+                              if (result.task) {
+                                setTask(result.task);
+                                console.log(
+                                  "Updated task with new files:",
+                                  result.task
+                                );
+                              } else {
+                                console.warn(
+                                  "No task returned in response, fetching fresh data"
+                                );
+                                // Refresh the data if task state update fails
+                                fetchTask();
+                              }
+
+                              // Clear the file input
+                              fileInput.value = "";
+                            } catch (error) {
+                              console.error("Error uploading files:", error);
+                              toast.error("Failed to upload files", {
+                                id: toastId,
+                              });
+                            }
+                          }}
+                          className="space-y-4"
+                        >
+                          <div className="flex flex-col space-y-2">
+                            <Label
+                              htmlFor="file-upload"
+                              className="text-sm font-medium text-slate-700"
+                            >
+                              Upload New Files
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                id="file-upload"
+                                type="file"
+                                multiple
+                                className="flex-1 cursor-pointer border-slate-200 focus-visible:ring-indigo-500"
+                              />
+                              <Button
+                                type="submit"
+                                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white"
+                              >
+                                <Paperclip className="mr-2 h-4 w-4" />
+                                Upload
+                              </Button>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              Upload documents, images, or other files related
+                              to this task.
+                            </p>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {attachments.length > 0 ? (
-                      attachments.map((attachment, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                    {task.files && (task.files as TaskFile[]).length > 0 ? (
+                      (task.files as TaskFile[]).map((file, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.1 }}
                           whileHover={{
                             scale: 1.02,
                             boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
                           }}
                           className="flex items-center gap-3 p-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-sm"
                         >
-                          {getFileIcon(attachment.type)}
+                          {getFileIcon(getFileType(file.name))}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-800 truncate hover:text-indigo-600">
-                          {attachment.name}
+                              {file.name}
                             </p>
-                        <p className="text-xs text-slate-500 capitalize">
-                              {attachment.type} · {attachment.size || "2.4 MB"}
-                        </p>
-                      </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
-                          >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M12 17V3" />
-                            <path d="m6 11 6 6 6-6" />
-                            <path d="M19 21H5" />
-                          </svg>
-                      </Button>
-                    </motion.div>
+                            <p className="text-xs text-slate-500 capitalize">
+                              {getFileType(file.name)} ·{" "}
+                              {file.size ||
+                                (file.type && file.type.split("/")[1])}
+                            </p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleFileDownload(file.path, file.name)
+                              }
+                              title="Download file"
+                              className="h-8 w-8 p-0 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M12 17V3" />
+                                <path d="m6 11 6 6 6-6" />
+                                <path d="M19 21H5" />
+                              </svg>
+                            </Button>
+
+                            {/* Delete button - only show for task assignee when task is not on hold and not completed */}
+                            {assignedUser?.email ===
+                              clerkUser?.emailAddresses[0].emailAddress &&
+                              !task.completed &&
+                              task.status !== "on_hold" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    const confirmDelete = window.confirm(
+                                      `Are you sure you want to delete "${file.name}"?`
+                                    );
+                                    if (!confirmDelete) return;
+
+                                    const toastId = toast.loading(
+                                      `Deleting ${file.name}...`
+                                    );
+                                    try {
+                                      const response = await fetch(
+                                        `/api/tasks/${taskId}/files`,
+                                        {
+                                          method: "DELETE",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                          },
+                                          body: JSON.stringify({
+                                            fileName: file.name,
+                                          }),
+                                        }
+                                      );
+
+                                      if (!response.ok) {
+                                        throw new Error(
+                                          `Delete failed: ${response.statusText}`
+                                        );
+                                      }
+
+                                      const result = await response.json();
+                                      toast.success(`${file.name} deleted`, {
+                                        id: toastId,
+                                      });
+
+                                      // Update the task state with new files list
+                                      if (task && result.task) {
+                                        setTask(result.task);
+                                      } else {
+                                        // Refresh the data if task state update fails
+                                        fetchTask();
+                                      }
+                                    } catch (error) {
+                                      console.error(
+                                        "Error deleting file:",
+                                        error
+                                      );
+                                      toast.error(
+                                        `Failed to delete ${file.name}`,
+                                        { id: toastId }
+                                      );
+                                    }
+                                  }}
+                                  title="Delete file"
+                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                          </div>
+                        </motion.div>
                       ))
                     ) : (
                       <div className="col-span-full flex flex-col items-center justify-center p-10 text-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
@@ -678,22 +1010,26 @@ export default function TaskPage() {
                         <p className="text-slate-500 text-sm mb-4">
                           Upload files to share with the team
                         </p>
-                        <Button
-                          variant="outline"
-                          className="mt-2 bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                        >
-                          <Paperclip className="w-4 h-4 mr-2" /> Upload Files
-                        </Button>
+                        {assignedUser?.email ===
+                          clerkUser?.emailAddresses[0].emailAddress &&
+                          !task.completed &&
+                          task.status !== "on_hold" && (
+                            <TaskButton
+                              type="edit"
+                              onSubmit={handleSubmit}
+                              task={task}
+                            />
+                          )}
                       </div>
                     )}
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           </div>
 
           <div className="space-y-6">
-            {/* Actions Section */}
+            {/* Actions Section - only visible to assignee */}
             {assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress && (
               <motion.div
@@ -703,26 +1039,26 @@ export default function TaskPage() {
               >
                 <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
                   <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
-                <CardTitle className="text-lg text-slate-800">
+                    <CardTitle className="text-lg text-slate-800">
                       Task Actions
-                </CardTitle>
+                    </CardTitle>
                     <CardDescription className="text-slate-500 text-sm mt-1">
                       Manage task status and delegation
                     </CardDescription>
-              </CardHeader>
+                  </CardHeader>
                   <CardContent className="p-6">
                     {task.completed ? (
-                <div className="space-y-4">
+                      <div className="space-y-4">
                         <div className="rounded-lg p-4 bg-emerald-50 border border-emerald-200 text-emerald-800">
                           <div className="flex items-center gap-2 mb-2">
                             <CheckCircle className="h-5 w-5 text-emerald-600" />
                             <h3 className="font-medium">Task Completed</h3>
-                    </div>
+                          </div>
                           <p className="text-sm">
                             This task has been marked as complete. You can mark
                             it as incomplete if needed.
-                      </p>
-                    </div>
+                          </p>
+                        </div>
 
                         <motion.div
                           whileHover={{ scale: 1.01 }}
@@ -743,7 +1079,7 @@ export default function TaskPage() {
                             Mark as Incomplete
                           </Button>
                         </motion.div>
-                  </div>
+                      </div>
                     ) : (
                       <div className="space-y-4">
                         {/* On hold / Resume task button */}
@@ -752,33 +1088,89 @@ export default function TaskPage() {
                           whileTap={{ scale: 0.98 }}
                           className="overflow-hidden rounded-lg shadow-sm"
                         >
-                          <Button
-                            onClick={() => {
-                              const newTask: Task = { ...task };
-                              newTask.completed = false;
-                              newTask.status =
-                                newTask.status === "on_hold" ? null : "on_hold";
-                              setTask(newTask);
-                              handleUpdateTask(newTask);
-                            }}
-                            className={`w-full ${
-                              task.status === "on_hold"
-                                ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
-                                : "bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white"
-                            } shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium`}
-                          >
-                            {task.status === "on_hold" ? (
-                              <>
-                                <Repeat className="w-5 h-5 mr-2" />
-                                Resume Task
-                              </>
-                            ) : (
-                              <>
-                                <PauseCircle className="w-5 h-5 mr-2" />
-                                Put On Hold
-                              </>
-                            )}
-                          </Button>
+                          {task.status === "on_hold" ? (
+                            <Button
+                              onClick={() => {
+                                const newTask: Task = { ...task };
+                                newTask.completed = false;
+                                newTask.status = null;
+                                newTask.onHoldReason = null;
+                                setTask(newTask);
+                                handleUpdateTask(newTask);
+                              }}
+                              className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium"
+                            >
+                              <Repeat className="w-5 h-5 mr-2" />
+                              Resume Task
+                            </Button>
+                          ) : (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button className="w-full bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium">
+                                  <PauseCircle className="w-5 h-5 mr-2" />
+                                  Put On Hold
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle className="text-xl text-slate-800">
+                                    Put Task On Hold
+                                  </DialogTitle>
+                                  <DialogDescription className="text-slate-500 mt-2">
+                                    Please provide a reason for putting this
+                                    task on hold.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <Label
+                                    htmlFor="onHoldReason"
+                                    className="text-slate-700"
+                                  >
+                                    Reason
+                                  </Label>
+                                  <Textarea
+                                    id="onHoldReason"
+                                    placeholder="Explain why you're putting this task on hold..."
+                                    className="min-h-[120px] resize-none border-slate-300 focus-visible:ring-indigo-500"
+                                    value={task.onHoldReason || ""}
+                                    onChange={(e) => {
+                                      const newTask = { ...task };
+                                      newTask.onHoldReason = e.target.value;
+                                      setTask(newTask);
+                                    }}
+                                  />
+                                  <Button
+                                    className="w-full bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white"
+                                    disabled={!task.onHoldReason?.trim()}
+                                    onClick={() => {
+                                      if (!task.onHoldReason?.trim()) {
+                                        toast.error(
+                                          "Please provide a reason for putting the task on hold"
+                                        );
+                                        return;
+                                      }
+
+                                      const newTask: Task = { ...task };
+                                      newTask.completed = false;
+                                      newTask.status = "on_hold";
+                                      handleUpdateTask(newTask);
+
+                                      // Close the dialog
+                                      const closeButton =
+                                        document.querySelector(
+                                          '[data-state="open"] button[aria-label="Close"]'
+                                        );
+                                      if (closeButton instanceof HTMLElement) {
+                                        closeButton.click();
+                                      }
+                                    }}
+                                  >
+                                    Confirm
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
                         </motion.div>
 
                         {/* Mark as complete button */}
@@ -867,36 +1259,28 @@ export default function TaskPage() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                    </div>
+                                </div>
                               </DialogContent>
                             </Dialog>
                           </motion.div>
                         )}
 
-                        {/* Request deadline extension - only if not on hold and no existing request */}
+                        {/* Request deadline extension button - only shown if task is not on hold and no existing request */}
                         {task.status !== "on_hold" && (
-                          <motion.div
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="overflow-hidden rounded-lg shadow-sm"
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsEditing((prev) => !prev)}
+                            disabled={!!task.requestDateExtensionReason}
+                            className={`w-full border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium ${
+                              !!task.requestDateExtensionReason &&
+                              "opacity-50 cursor-not-allowed"
+                            }`}
                           >
-                  <Button
-                    variant="outline"
-                              onClick={() => setIsEditing((prev) => !prev)}
-                              disabled={!!task.requestDateExtensionReason}
-                              className={`w-full border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium ${
-                                !!task.requestDateExtensionReason &&
-                                "opacity-50 cursor-not-allowed"
-                              }`}
-                            >
-                              <AlertCircle className="w-5 h-5 mr-2" />
-                              {!!task.requestDateExtensionReason
-                                ? "Extension Already Requested"
-                                : "Request Deadline Extension"}
-                  </Button>
-                          </motion.div>
+                            <AlertCircle className="w-5 h-5 mr-2" />
+                            Request Deadline Extension
+                          </Button>
                         )}
-                </div>
+                      </div>
                     )}
 
                     {/* Extension request form */}
@@ -904,57 +1288,57 @@ export default function TaskPage() {
                       !task.requestDateExtensionReason &&
                       !task.completed &&
                       task.status !== "on_hold" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    transition={{ duration: 0.3 }}
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          transition={{ duration: 0.3 }}
                           className="mt-6 space-y-4 p-5 rounded-lg border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner"
-                  >
+                        >
                           <h3 className="font-medium text-amber-800 flex items-center gap-2 text-base">
                             <AlertCircle className="h-5 w-5" />
-                      Request Due Date Extension
-                    </h3>
+                            Request Due Date Extension
+                          </h3>
                           <div className="space-y-4">
-                      <div>
+                            <div>
                               <Label
                                 htmlFor="newDueDate"
                                 className="text-amber-800 mb-1.5 block text-sm font-medium"
                               >
-                          New Due Date
-                        </Label>
-                        <Input
-                          id="newDueDate"
-                          type="date"
-                          value={newDueDate}
-                          onChange={(e) => setNewDueDate(e.target.value)}
+                                New Due Date
+                              </Label>
+                              <Input
+                                id="newDueDate"
+                                type="date"
+                                value={newDueDate}
+                                onChange={(e) => setNewDueDate(e.target.value)}
                                 className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm h-10 text-sm w-full"
-                        />
-                      </div>
-                      <div>
-                        <Label
-                          htmlFor="extensionReason"
+                              />
+                            </div>
+                            <div>
+                              <Label
+                                htmlFor="extensionReason"
                                 className="text-amber-800 mb-1.5 block text-sm font-medium"
-                        >
-                          Reason for Extension
-                        </Label>
-                        <Textarea
-                          id="extensionReason"
-                          value={extensionReason}
+                              >
+                                Reason for Extension
+                              </Label>
+                              <Textarea
+                                id="extensionReason"
+                                value={extensionReason}
                                 onChange={(e) =>
                                   setExtensionReason(e.target.value)
                                 }
                                 placeholder="Please explain why you need more time to complete this task..."
                                 className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm min-h-[120px] text-sm w-full"
-                        />
-                      </div>
-                    </div>
+                              />
+                            </div>
+                          </div>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
                             className="pt-2"
                           >
-                    <Button
-                      onClick={handleRequestExtension}
+                            <Button
+                              onClick={handleRequestExtension}
                               disabled={!newDueDate || !extensionReason}
                               className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md h-11 font-medium ${
                                 (!newDueDate || !extensionReason) &&
@@ -963,16 +1347,16 @@ export default function TaskPage() {
                             >
                               <Calendar className="w-5 h-5 mr-2" />
                               Submit Extension Request
-                    </Button>
+                            </Button>
                           </motion.div>
-                  </motion.div>
-                )}
-              </CardContent>
-            </Card>
+                        </motion.div>
+                      )}
+                  </CardContent>
+                </Card>
               </motion.div>
             )}
 
-            {/* Task Details Section */}
+            {/* Task Details Section - visible to all users */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}

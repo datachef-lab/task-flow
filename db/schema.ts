@@ -41,6 +41,7 @@ export const taskModel = pgTable("tasks", {
     dueDate: date("due_date").defaultNow(),
     priorityType: priorityEnum("priority_type").default("normal").notNull(),
     completed: boolean().notNull().default(false),
+    onHoldReason: varchar("on_hold_reason", { length: 2000 }),
     status: taskStatusEnum(),
     requestedDate: date("requested_date"),
     requestDateExtensionReason: varchar("request_date_extension_reason", { length: 2000 }),

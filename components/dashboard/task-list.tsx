@@ -63,7 +63,13 @@ import {
 
 interface TaskListProps {
   allTasks: Task[];
-  filter?: "all" | "pending" | "completed" | "overdue" | "date_extension";
+  filter?:
+    | "all"
+    | "pending"
+    | "completed"
+    | "overdue"
+    | "date_extension"
+    | "on_hold";
   users: User[];
   onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
   onTaskDelete: (taskId: number) => Promise<void>;
@@ -201,6 +207,7 @@ export function TaskList({
         );
       if (filter === "date_extension")
         return !!task.requestedDate && !!task.requestDateExtensionReason;
+      if (filter === "on_hold") return task.status === "on_hold";
       return true;
     })
     .filter((task) => {
@@ -282,6 +289,9 @@ export function TaskList({
     } else if (filter === "date_extension") {
       message = "No extension requests";
       description = "There are no pending extension requests";
+    } else if (filter === "on_hold") {
+      message = "No on-hold tasks";
+      description = "All tasks are in progress or completed";
     } else if (searchQuery) {
       message = "No matching tasks";
       description = `No tasks found matching "${searchQuery}"`;
@@ -348,6 +358,51 @@ export function TaskList({
     }
 
     return items;
+  };
+
+  // Task status badge
+  const getStatusBadge = (task: Task) => {
+    if (task.completed) {
+      return (
+        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 gap-1 hover:bg-emerald-200">
+          <CheckCircle className="h-3 w-3" /> Completed
+        </Badge>
+      );
+    }
+
+    if (task.status === "on_hold") {
+      return (
+        <Badge className="bg-amber-100 text-amber-800 border-amber-200 gap-1 hover:bg-amber-200">
+          <PauseCircle className="h-3 w-3" /> On Hold
+        </Badge>
+      );
+    }
+
+    if (
+      task.dueDate &&
+      currentDate &&
+      isBefore(new Date(task.dueDate), currentDate)
+    ) {
+      return (
+        <Badge className="bg-red-100 text-red-800 border-red-200 gap-1 hover:bg-red-200">
+          <Clock className="h-3 w-3" /> Overdue
+        </Badge>
+      );
+    }
+
+    if (task.requestedDate && task.requestDateExtensionReason) {
+      return (
+        <Badge className="bg-purple-100 text-purple-800 border-purple-200 gap-1 hover:bg-purple-200">
+          <Calendar className="h-3 w-3" /> Extension Requested
+        </Badge>
+      );
+    }
+
+    return (
+      <Badge className="bg-blue-100 text-blue-800 border-blue-200 gap-1 hover:bg-blue-200">
+        <Clock className="h-3 w-3" /> In Progress
+      </Badge>
+    );
   };
 
   return (
@@ -449,6 +504,8 @@ export function TaskList({
               <Clock className="h-8 w-8 text-red-500" />
             ) : filter === "date_extension" ? (
               <AlertCircle className="h-8 w-8 text-amber-500" />
+            ) : filter === "on_hold" ? (
+              <PauseCircle className="h-8 w-8 text-amber-500" />
             ) : (
               <PlusCircle className="h-8 w-8 text-indigo-500" />
             )}
@@ -615,24 +672,34 @@ export function TaskList({
                         {getPriorityBadge(task.priorityType)}
                       </TableCell>
 
-                      <TableCell className="text-center py-4 px-4 whitespace-nowrap align-middle">
-                        {task.completed ? (
-                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
-                            <CheckCircle className="h-3 w-3" /> Complete
-                          </Badge>
-                        ) : isOverdue ? (
-                          <Badge className="bg-red-100 text-red-800 border-red-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
-                            <Clock className="h-3 w-3" /> Overdue
-                          </Badge>
-                        ) : task.status === "on_hold" ? (
-                          <Badge className="bg-slate-100 text-slate-800 border-slate-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
-                            <PauseCircle className="h-3 w-3" /> On Hold
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 gap-1 text-xs font-medium py-1 px-2.5 shadow-sm">
-                            <Clock className="h-3 w-3" /> In Progress
-                          </Badge>
-                        )}
+                      <TableCell className="py-4">
+                        <div className="flex items-center">
+                          {getStatusBadge(task)}
+
+                          {task.status === "on_hold" && task.onHoldReason && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 ml-1"
+                                  >
+                                    <MessageSquare className="h-4 w-4 text-amber-500" />
+                                    <span className="sr-only">View reason</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-sm">
+                                  <div className="font-medium text-sm mb-1">
+                                    On Hold Reason:
+                                  </div>
+                                  <div className="text-xs">
+                                    {task.onHoldReason}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </TableCell>
 
                       <TableCell className="text-right py-4 px-4 align-middle">

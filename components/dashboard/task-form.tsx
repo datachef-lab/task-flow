@@ -249,14 +249,75 @@ export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
           id="files"
           name="files"
           type="file"
-          onChange={handleFilesChange}
           multiple
+          onChange={handleFilesChange}
+          className="border-slate-200 focus-visible:ring-indigo-500"
         />
+        {files && files.length > 0 && (
+          <div className="space-y-2 mt-2">
+            <Label>Selected Files</Label>
+            <div className="grid gap-2">
+              {Array.from(files).map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 border rounded bg-slate-50 border-slate-200"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-full bg-indigo-100 p-1.5">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-indigo-600"
+                      >
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-slate-700 truncate max-w-[180px]">
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {(file.size / 1024).toFixed(1)} KB
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Please wait..." : task ? "Update Task" : "Create Task"}
-      </Button>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+          disabled={loading}
+          className="bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white"
+        >
+          {loading
+            ? "Submitting..."
+            : type === "add"
+            ? "Create Task"
+            : "Update Task"}
+        </Button>
+      </div>
     </form>
   );
 }
