@@ -54,6 +54,9 @@ import {
   HelpCircle,
   Loader2,
   Trash,
+  PauseCircle,
+  CheckCircle,
+  Repeat,
 } from "lucide-react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
@@ -196,28 +199,29 @@ export default function TaskPage() {
     fetchUsers();
   }, []);
 
+  const fetchTask = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load task: ${response.statusText}`);
+      }
+      const data: Task = await response.json();
+      setTask(data);
+      fetchUser(data.createdUserId as number, "created");
+      fetchUser(data.assignedUserId as number, "assigned");
+    } catch (error) {
+      console.error("Error fetching task:", error);
+      setError("Failed to load task. Please try again later.");
+      toast.error("Failed to load task");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Fetch task data using taskId
-    const fetchTask = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/tasks/${taskId}`);
-        if (!response.ok) {
-          throw new Error(`Failed to load task: ${response.statusText}`);
-        }
-        const data: Task = await response.json();
-        setTask(data);
-        fetchUser(data.createdUserId as number, "created");
-        fetchUser(data.assignedUserId as number, "assigned");
-      } catch (error) {
-        console.error("Error fetching task:", error);
-        setError("Failed to load task. Please try again later.");
-        toast.error("Failed to load task");
-      } finally {
-        setIsLoading(false);
-      }
-    };
 
     if (taskId) {
       fetchTask();
@@ -278,18 +282,50 @@ export default function TaskPage() {
 
   const handleUpdateTask = async (task: Task) => {
     try {
-      await fetch(`/api/tasks/${taskId}`, {
+      //   setIsLoading(true);
+      const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(task),
       });
-      router.refresh();
-      setTask(task);
-      toast.success("task saved successfully!");
+
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+
+      const updatedTask = await response.json();
+      setTask(updatedTask);
+
+      // Fetch updated user data
+      if (updatedTask.assignedUserId) {
+        await fetchUser(updatedTask.assignedUserId, "assigned");
+      }
+
+      try {
+        const response = await fetch(`/api/tasks/${taskId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to load task: ${response.statusText}`);
+        }
+        const data: Task = await response.json();
+        setTask(data);
+        fetchUser(data.createdUserId as number, "created");
+        fetchUser(data.assignedUserId as number, "assigned");
+      } catch (error) {
+        console.error("Error fetching task:", error);
+        setError("Failed to load task. Please try again later.");
+        toast.error("Failed to load task");
+      } finally {
+      }
+
+      toast.success("Task updated successfully!");
     } catch (error) {
-      toast.error("Some error went.");
+      console.error("Error updating task:", error);
+      toast.error("Failed to update task");
+    } finally {
+      //   setIsLoading(false);
+      router.refresh();
     }
   };
 
@@ -304,6 +340,8 @@ export default function TaskPage() {
     const newTask = { ...task };
     newTask.requestedDate = newDueDate;
     newTask.requestDateExtensionReason = extensionReason;
+    console.log("updating for request:", newTask);
+    setTask(newTask);
 
     await handleUpdateTask(newTask);
   };
@@ -421,7 +459,8 @@ export default function TaskPage() {
           <div className="flex flex-wrap gap-2 mt-2 lg:mt-0 lg:flex-nowrap">
             {assignedUser?.email ===
               clerkUser?.emailAddresses[0].emailAddress &&
-              task.status !== "completed" && (
+              task.status !== "completed" &&
+              task.status == "on_hold" && (
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -502,12 +541,12 @@ export default function TaskPage() {
                 <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-3 border-b border-indigo-100 px-5 py-3">
                   <CardTitle className="text-base text-slate-800 flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-indigo-500" />
-                    Remarks
+                    Special Note
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-5">
-                  <p className="text-slate-700 leading-relaxed">
-                    {task?.remarks}
+                  <p className="text-muted-foreground leading-relaxed">
+                    {task?.remarks || "Please write your remarks here (optional)"}.
                   </p>
                 </CardContent>
               </Card>
@@ -758,17 +797,69 @@ export default function TaskPage() {
                   </CardHeader>
                   <CardContent className="p-5">
                     <div className="space-y-3">
-                      <motion.div
+                      {!task.completed && (
+                        <motion.div
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Button
+                            onClick={() => {
+                              const newTask: Task = { ...task };
+                              newTask.completed = false;
+                              newTask.status =
+                                newTask.status === "on_hold" ? null : "on_hold";
+                              setTask(newTask);
+                              handleUpdateTask(newTask);
+                            }}
+                            className={`w-full ${
+                              task.status === "on_hold"
+                                ? "bg-gradient-to-r from-orange-500 to-orange-700 hover:from-orange-600 hover:to-orange-800 text-white"
+                                : "bg-red-500 text-white border hover:bg-red-600"
+                            } shadow-md flex items-center justify-center h-10`}
+                          >
+                            <PauseCircle className="w-5 h-5 mr-2" />
+                            On Hold
+                          </Button>
+                        </motion.div>
+                      )}
+                      {
+                        <motion.div
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Button
+                            onClick={() => {
+                              const newTask: Task = { ...task };
+                              newTask.completed = !newTask.completed;
+                              newTask.status = newTask.completed
+                                ? "completed"
+                                : null;
+                              setTask(newTask);
+                              handleUpdateTask(newTask);
+                            }}
+                            className={`w-full ${
+                              task.completed
+                                ? "bg-gradient-to-r from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white"
+                                : "border bg-transparent text-black hover:bg-slate-50"
+                            } shadow-md flex items-center justify-center h-10`}
+                          >
+                            <CheckCircle className="w-5 h-5 mr-2" />
+                            {task.completed ? "Completed" : "Marks as complete"}
+                          </Button>
+                        </motion.div>
+                      }
+
+                      {/* <motion.div
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                       >
                         <Dialog>
                           <DialogTrigger className="w-full">
-                            <Button className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white shadow-sm h-9">
-                              <Forward className="w-4 h-4 mr-2" />
-                              {task.status
-                                ? `Task Status: ${task.status?.toUpperCase()}`
-                                : "In Progress"}
+                        
+
+                            <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-800 hover:from-purple-700 hover:to-purple-900 text-white shadow-md flex items-center justify-center h-10">
+                              <Repeat className="w-5 h-5 mr-2" />
+                              Re-delegate
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
@@ -811,20 +902,19 @@ export default function TaskPage() {
                             </DialogHeader>
                           </DialogContent>
                         </Dialog>
-                      </motion.div>
-                      {task.status !== "completed" && (
+                      </motion.div> */}
+
+                      {/* Forward task */}
+                      {task.status === "on_hold" && (
                         <motion.div
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.98 }}
                         >
                           <Dialog>
                             <DialogTrigger className="w-full">
-                              <Button
-                                disabled={task.status === "completed"}
-                                className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9"
-                              >
+                              <Button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-sm h-9">
                                 <Forward className="w-4 h-4 mr-2" />
-                                Forward Task
+                                Re-delegate
                               </Button>
                             </DialogTrigger>
                             <DialogContent>
@@ -838,12 +928,14 @@ export default function TaskPage() {
                                     <Select
                                       name="assignedUserId"
                                       value={task.assignedUserId?.toString()}
-                                      onValueChange={(value) =>
-                                        setTask((prev) => ({
-                                          ...prev!,
+                                      onValueChange={(value) => {
+                                        const newTask: Task = {
+                                          ...task,
                                           assignedUserId: Number(value),
-                                        }))
-                                      }
+                                        };
+                                        setTask(newTask);
+                                        handleUpdateTask(newTask);
+                                      }}
                                     >
                                       <SelectTrigger>
                                         <SelectValue placeholder="Select user" />
@@ -859,13 +951,6 @@ export default function TaskPage() {
                                         ))}
                                       </SelectContent>
                                     </Select>
-                                    <div className="flex justify-end">
-                                      <Button
-                                        onClick={() => handleUpdateTask(task)}
-                                      >
-                                        Save
-                                      </Button>
-                                    </div>
                                   </div>
                                 </DialogDescription>
                               </DialogHeader>
@@ -873,22 +958,37 @@ export default function TaskPage() {
                           </Dialog>
                         </motion.div>
                       )}
-                      {task.status !== "completed" && (
-                        <motion.div
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <Button
+
+                      {task.completed == false &&
+                        task.status !== "completed" && (
+                          <motion.div
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            {/* <Button
                             variant="outline"
                             onClick={() => setIsEditing(!isEditing)}
                             disabled={!!task.requestDateExtensionReason}
                             className="w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-sm h-9"
                           >
                             <AlertCircle className="w-4 h-4 mr-2" />
-                            Request Extension
-                          </Button>
-                        </motion.div>
-                      )}
+                            Extension Required
+                          </Button> */}
+
+                            <Button
+                              variant="outline"
+                              onClick={() => setIsEditing((prev) => !prev)}
+                              disabled={
+                                !!task.requestDateExtensionReason ||
+                                task.status !== "on_hold"
+                              }
+                              className="w-full border-red-400 bg-red-50 text-red-700 hover:bg-red-100 shadow-md flex items-center justify-center h-10"
+                            >
+                              <AlertCircle className="w-5 h-5 mr-2" />
+                              Extension Required
+                            </Button>
+                          </motion.div>
+                        )}
                     </div>
 
                     {(isEditing || task.requestDateExtensionReason) && (
@@ -931,9 +1031,13 @@ export default function TaskPage() {
                                 task.requestDateExtensionReason ||
                                 extensionReason
                               }
-                              onChange={(e) =>
-                                setExtensionReason(e.target.value)
-                              }
+                              onChange={(e) => {
+                                setExtensionReason(e.target.value);
+                                setTask((prev) => ({
+                                  ...prev!,
+                                  requestDateExtensionReason: e.target.value,
+                                }));
+                              }}
                               placeholder="Please explain why you need an extension..."
                               className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm min-h-20 text-sm"
                             />
@@ -946,8 +1050,8 @@ export default function TaskPage() {
                           <Button
                             onClick={handleRequestExtension}
                             disabled={
-                              !!task.requestDateExtensionReason ||
-                              task.status === "completed"
+                              //   !!task.requestDateExtensionReason ||
+                              task.completed == true
                             }
                             className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm h-9"
                           >
