@@ -60,6 +60,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { useAuth } from "@/hooks/use-auth";
 
 interface TaskListProps {
   allTasks: Task[];
@@ -69,7 +70,9 @@ interface TaskListProps {
     | "completed"
     | "overdue"
     | "date_extension"
-    | "on_hold";
+    | "on_hold"
+    | "assigne_by_me"
+    | "assigne_to_me";
   users: User[];
   onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
   onTaskDelete: (taskId: number) => Promise<void>;
@@ -82,6 +85,7 @@ export function TaskList({
   onSubmit,
   onTaskDelete,
 }: TaskListProps) {
+  const { user } = useAuth();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>(allTasks);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -192,7 +196,7 @@ export function TaskList({
           <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
             NORMAL
           </Badge>
-      );
+        );
     }
   };
 
@@ -201,6 +205,9 @@ export function TaskList({
       // Filter by status
       if (filter === "pending") return !task.completed;
       if (filter === "completed") return task.completed;
+      if (filter === "assigne_by_me") return task.createdUserId === user?.id;
+      if (filter === "assigne_to_me") return task.assignedUserId === user?.id;
+
       if (filter === "overdue")
         return (
           !task.completed && task.dueDate && new Date(task.dueDate) < new Date()
@@ -590,7 +597,7 @@ export function TaskList({
 
                   return (
                     <TableRow
-            key={task.id}
+                      key={task.id}
                       className={`${
                         task.completed
                           ? "bg-slate-50/80"

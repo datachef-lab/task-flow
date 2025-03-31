@@ -414,3 +414,57 @@ export const sendWhatsAppMessage = async (to: string, messageArr: string[] = [],
         // throw error
     }
 }
+
+export async function getTasksAssignedByMe(userId: number, page: number = 1, size: number = 10) {
+    const offset = (page - 1) * size;
+
+    const [tasks, totalTasks] = await Promise.all([
+        db
+            .select()
+            .from(taskModel)
+            .where(eq(taskModel.createdUserId, userId))
+            .orderBy(desc(taskModel.createdAt))
+            .limit(size)
+            .offset(offset),
+        db
+            .select({ count: count() })
+            .from(taskModel)
+            .where(eq(taskModel.createdUserId, userId)),
+    ]);
+
+    const totalPages = Math.ceil(totalTasks[0].count / size);
+
+    return {
+        tasks,
+        currentPage: page,
+        totalPages,
+        totalTasks: totalTasks[0].count,
+    };
+}
+
+export async function getTasksAssignedToMe(userId: number, page: number = 1, size: number = 10) {
+    const offset = (page - 1) * size;
+
+    const [tasks, totalTasks] = await Promise.all([
+        db
+            .select()
+            .from(taskModel)
+            .where(eq(taskModel.assignedUserId, userId))
+            .orderBy(desc(taskModel.createdAt))
+            .limit(size)
+            .offset(offset),
+        db
+            .select({ count: count() })
+            .from(taskModel)
+            .where(eq(taskModel.assignedUserId, userId)),
+    ]);
+
+    const totalPages = Math.ceil(totalTasks[0].count / size);
+
+    return {
+        tasks,
+        currentPage: page,
+        totalPages,
+        totalTasks: totalTasks[0].count,
+    };
+}

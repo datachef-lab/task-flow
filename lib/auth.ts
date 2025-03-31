@@ -5,6 +5,7 @@ import { userModel } from '@/db/schema';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import { NextResponse } from 'next/server';
 
 // JWT Secret should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
@@ -74,28 +75,58 @@ export function verifyRefreshToken(token: string): TokenPayload | null {
     }
 }
 
-// Set auth cookies
-export async function setAuthCookies(tokens: AuthTokens) {
-    const cookieStore = await cookies();
 
-    // Set refresh token in HTTP-only cookie for security
-    cookieStore.set('refreshToken', tokens.refreshToken, {
+// Set auth cookies
+// export async function setAuthCookies(tokens: AuthTokens, response: ) {
+//     const cookieStore = await cookies();
+
+//     // Set refresh token in HTTP-only cookie for security
+//     cookieStore.set('refreshToken', tokens.refreshToken, {
+//         httpOnly: true,
+//         secure: false,
+//         sameSite: 'strict',
+//         maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+//         path: '/'
+//     });
+
+//     // Just for fallback/compatibility, not the main storage method
+//     cookieStore.set('accessToken', tokens.accessToken, {
+//         httpOnly: true,
+//         secure: false,
+//         sameSite: 'strict',
+//         maxAge: 60 * 60, // 15 minutes in seconds
+//         path: '/'
+//     });
+// }
+export function setAuthCookies(tokens: AuthTokens) {
+    const response = new NextResponse(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+    response.cookies.set({
+        name: 'refreshToken',
+        value: tokens.refreshToken,
         httpOnly: true,
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
-        path: '/'
+        path: '/',
     });
 
-    // Just for fallback/compatibility, not the main storage method
-    cookieStore.set('accessToken', tokens.accessToken, {
+    response.cookies.set({
+        name: 'accessToken',
+        value: tokens.accessToken,
         httpOnly: true,
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 60 * 60, // 15 minutes in seconds
-        path: '/'
+        maxAge: 15 * 60, // 15 minutes in seconds
+        path: '/',
     });
+
+    return response;
 }
+
 
 // Clear auth cookies
 export async function clearAuthCookies() {

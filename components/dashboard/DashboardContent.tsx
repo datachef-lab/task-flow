@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { TaskList } from "@/components/TaskList";
+import { TaskList } from "./task-list";
 
 const DashboardContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
@@ -10,11 +10,23 @@ const DashboardContent: React.FC = () => {
   const [users, setUsers] = useState([]);
   const [tasks, setTasks] = useState([]);
 
-  const handleSubmit = (task: any) => {
+  const handleSubmit = async (
+    type: "add" | "edit",
+    task: {
+      completed: boolean;
+      id: number;
+      createdAt: Date | null;
+      updatedAt: Date | null;
+      abbreviation: string;
+      description: string;
+      assignedUserId: number | null;
+      files: unknown;
+    }
+  ): Promise<void> => {
     // Implementation of handleSubmit
   };
 
-  const handleTaskDelete = (taskId: string) => {
+  const handleTaskDelete = async (taskId: number): Promise<void> => {
     // Implementation of handleTaskDelete
   };
 
@@ -32,6 +44,8 @@ const DashboardContent: React.FC = () => {
           <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="overdue">Overdue</TabsTrigger>
           <TabsTrigger value="date_extension">Date Extension</TabsTrigger>
+          <TabsTrigger value="assigne_by_me">Assigne by me</TabsTrigger>
+          <TabsTrigger value="assigne_to_me">Assigne to me</TabsTrigger>
         </TabsList>
 
         {/* Tab Content */}
