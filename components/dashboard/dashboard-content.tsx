@@ -186,8 +186,8 @@ export function DashboardContent({
           heading="Task Dashboard"
           text="Manage your tasks, monitor progress, and track deadlines."
         >
-        <TaskButtonWrapper onSubmit={handleSubmit} />
-      </DashboardHeader>
+          <TaskButtonWrapper onSubmit={handleSubmit} />
+        </DashboardHeader>
       </motion.div>
 
       {/* Stats Cards */}
@@ -340,7 +340,7 @@ export function DashboardContent({
           onValueChange={(value) => setActiveTab(value as typeof activeTab)}
           className="w-full"
         >
-          <TabsList className="grid grid-cols-6 w-full h-auto max-w-full mx-auto mb-8 bg-slate-100 p-1.5 rounded-lg">
+          <TabsList className="grid grid-cols-8 w-full h-auto max-w-full mx-auto mb-8 bg-slate-100 p-1.5 rounded-lg">
             <TabsTrigger
               value="all"
               className="rounded-md py-2.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm"
@@ -377,9 +377,21 @@ export function DashboardContent({
             >
               Extensions
             </TabsTrigger>
-        </TabsList>
+            <TabsTrigger
+              value="assigne_by_me"
+              className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-sm h-auto py-2.5 text-sm font-medium"
+            >
+              Assigne by me
+            </TabsTrigger>
+            <TabsTrigger
+              value="assigne_to_me"
+              className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-sm h-auto py-2.5 text-sm font-medium"
+            >
+              Assigne to me
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Tab Content */}
+          {/* Tab Content */}
           <div className="pb-2">
             <TabsContent value="all" className="m-0 pt-2 w-full">
               <TaskList
@@ -427,16 +439,34 @@ export function DashboardContent({
               />
             </TabsContent>
             <TabsContent value="on_hold" className="m-0 pt-2 w-full">
-            <TaskList
-              users={users}
+              <TaskList
+                users={users}
                 allTasks={tasks}
                 filter="on_hold"
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
-            />
-          </TabsContent>
+              />
+            </TabsContent>
+            <TabsContent value="assigne_by_me" className="mt-4">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter="assigne_by_me"
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
+            <TabsContent value="assigne_to_me" className="mt-4">
+              <TaskList
+                users={users}
+                allTasks={tasks}
+                filter="assigne_to_me"
+                onSubmit={handleSubmit}
+                onTaskDelete={handleTaskDelete}
+              />
+            </TabsContent>
           </div>
-      </Tabs>
+        </Tabs>
       </motion.div>
     </main>
   );

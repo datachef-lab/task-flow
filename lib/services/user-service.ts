@@ -1,4 +1,5 @@
 "use server";
+import bcrypt from "bcrypt";
 import { count, eq } from "drizzle-orm";
 import { db } from "../../db";
 import { User, userModel } from "../../db/schema";
@@ -33,7 +34,7 @@ export async function updateUser(id: number, givenUser: User) {
         return null;
     }
 
-    const { id: tmpId, ...props } = givenUser;
+    const { id: tmpId, password, ...props } = givenUser;
 
     const [updatedUser] = await db
         .update(userModel)
@@ -50,13 +51,16 @@ export async function createUser(user: User) {
 
     const { id: tmpId, ...props } = user;
 
+    // Hash the password before storing it in the database
+    const hashedPassword = await bcrypt.hash(user.whatsappNumber, 10);
+
     if (foundUser) {
         return null;
     }
 
     const [createdUser] = await db
         .insert(userModel)
-        .values({ ...props })
+        .values({ ...props, password: hashedPassword })
         .returning();
 
     // TODO: Log the activity

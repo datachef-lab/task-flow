@@ -200,43 +200,49 @@ export function TaskList({
     }
   };
 
-  let filteredTasks = tasks
-    .filter((task) => {
+  let filteredTasks = tasks || [];
+
+  if (filter) {
+    filteredTasks = filteredTasks.filter((task) => {
       // Filter by status
       if (filter === "pending") return !task.completed;
       if (filter === "completed") return task.completed;
-      if (filter === "assigne_by_me") return task.createdUserId === user?.id;
-      if (filter === "assigne_to_me") return task.assignedUserId === user?.id;
-
       if (filter === "overdue")
         return (
           !task.completed && task.dueDate && new Date(task.dueDate) < new Date()
         );
       if (filter === "date_extension")
         return !!task.requestedDate && !!task.requestDateExtensionReason;
-      if (filter === "on_hold") return task.status === "on_hold";
+      if (filter === "on_hold")
+        return !task.completed && task.status === "on_hold";
+      if (filter === "assigne_by_me") return task.createdUserId === user?.id;
+      if (filter === "assigne_to_me") return task.assignedUserId === user?.id;
       return true;
-    })
-    .filter((task) => {
-      // Filter by search query
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        task.description?.toLowerCase().includes(query) ||
-        task.abbreviation?.toLowerCase().includes(query) ||
-        task.remarks?.toLowerCase().includes(query)
-      );
-    })
-    .filter((task) => {
-      // Filter by priority
-      if (!priorityFilter) return true;
-      return task.priorityType === priorityFilter;
-    })
-    .filter((task) => {
-      // Filter by assignee
-      if (!assigneeFilter) return true;
-      return task.assignedUserId === assigneeFilter;
     });
+  }
+
+  filteredTasks = filteredTasks.filter((task) => {
+    // Filter by search query
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      task.description?.toLowerCase().includes(query) ||
+      task.abbreviation?.toLowerCase().includes(query) ||
+      task.remarks?.toLowerCase().includes(query)
+    );
+  });
+
+  filteredTasks = filteredTasks.filter((task) => {
+    // Filter by priority
+    if (!priorityFilter) return true;
+    return task.priorityType === priorityFilter;
+  });
+
+  filteredTasks = filteredTasks.filter((task) => {
+    // Filter by assignee
+    if (!assigneeFilter) return true;
+    return task.assignedUserId === assigneeFilter;
+  });
 
   // Sort tasks
   if (sortField) {

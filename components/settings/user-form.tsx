@@ -36,11 +36,13 @@ export default function UserForm({ type, user, onSubmit }: UserFormProps) {
       setGivenUser({
         name: "",
         email: "",
-        disabled: false,
+        disabled: null,
         whatsappNumber: "",
-        isAdmin: false,
+        isAdmin: null,
+        password: null,
+        picture: null,
         id: 0,
-        createdAt: new Date(),
+        createdAt: null,
         updatedAt: null,
       });
     } else {
@@ -63,6 +65,8 @@ export default function UserForm({ type, user, onSubmit }: UserFormProps) {
         disabled: false,
         whatsappNumber: "",
         isAdmin: false,
+        password: null,
+        picture: null,
         id: 0,
         createdAt: new Date(),
         updatedAt: null,

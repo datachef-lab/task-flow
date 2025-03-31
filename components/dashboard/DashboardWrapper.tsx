@@ -12,12 +12,16 @@ type DashboardWrapperProps = {
     task: Task,
     files?: FileList
   ) => Promise<void>;
+  assignedByMe: Task[];
+  assignedToMe: Task[];
 };
 
 export default function DashboardWrapper({
   tasks,
   users,
   handleSubmit,
+  assignedByMe,
+  assignedToMe,
 }: DashboardWrapperProps) {
   return (
     <div className="flex min-h-screen flex-col">

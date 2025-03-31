@@ -6,7 +6,8 @@ import { getUserById } from "@/lib/services/user-service";
 export async function GET() {
     try {
         // Get the refresh token from cookies
-        const refreshToken = cookies().get("refreshToken")?.value;
+        const cookieStore = cookies();
+        const refreshToken = cookieStore.get("refreshToken")?.value;
 
         if (!refreshToken) {
             return NextResponse.json(
@@ -16,8 +17,8 @@ export async function GET() {
         }
 
         // Verify the refresh token
-        const decoded = await verifyToken(refreshToken);
-        if (!decoded || !decoded.userId) {
+        const payload = verifyToken(refreshToken);
+        if (!payload || !payload.userId) {
             return NextResponse.json(
                 { error: "Invalid refresh token" },
                 { status: 401 }
@@ -25,7 +26,7 @@ export async function GET() {
         }
 
         // Get user details
-        const user = await getUserById(decoded.userId);
+        const user = await getUserById(payload.userId as number);
         if (!user) {
             return NextResponse.json(
                 { error: "User not found" },
@@ -34,7 +35,7 @@ export async function GET() {
         }
 
         // Generate new access token
-        const accessToken = await generateAccessToken(user);
+        const accessToken = generateAccessToken(user.id);
 
         return NextResponse.json({
             accessToken,
