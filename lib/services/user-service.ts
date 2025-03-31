@@ -68,7 +68,7 @@ export async function createUser(user: User) {
     return createdUser;
 }
 
-export async function getAllUsers(page: number = 1, size: number = 10) {
+export async function getAllUsers(page: number = 1, size: number = 100) {
     const offset = (page - 1) * size;
 
     const [users, totalUsers] = await Promise.all([

@@ -4,10 +4,11 @@ import { existsSync } from "fs";
 import { join } from "path";
 import path from "path";
 
+const DOCUMENT_PATH = process.env.DOCUMENT_PATH;
+
 export async function GET(request: NextRequest) {
     try {
-        // Get the path from the query string
-        const searchParams = request.nextUrl.searchParams;
+        const { searchParams } = new URL(request.url);
         const filePath = searchParams.get("path");
 
         console.log("Download request received for path:", filePath);
@@ -22,87 +23,71 @@ export async function GET(request: NextRequest) {
         }
 
         // Normalize the path to prevent directory traversal attacks
-        const normalizedPath = path.normalize(filePath).replace(/^(\.\.(\/|\\|$))+/, "");
+        const normalizedPath = filePath.replace(/^\/+/, "");
         console.log("Normalized path:", normalizedPath);
 
-        // Create the full file path
-        const fullPath = join(process.cwd(), normalizedPath);
-        console.log("Full file path:", fullPath);
+        // Construct the full file path using DOCUMENT_PATH
+        const fullFilePath = join(DOCUMENT_PATH!, normalizedPath);
+        console.log("Full file path:", fullFilePath);
 
         // Check if the file exists
-        if (!existsSync(fullPath)) {
-            console.error("File not found:", fullPath);
+        if (!existsSync(fullFilePath)) {
+            console.error("File not found:", fullFilePath);
             return NextResponse.json(
-                { error: "File not found", path: fullPath },
+                { error: "File not found" },
                 { status: 404 }
             );
         }
 
         // Read the file content
-        const fileBuffer = await readFile(fullPath);
-        console.log("File read successfully, size:", fileBuffer.length, "bytes");
+        const fileBuffer = await readFile(fullFilePath);
+        const fileName = normalizedPath.split("/").pop() || "file";
 
         // Get file extension and determine content type
-        const ext = path.extname(fullPath).toLowerCase();
+        const ext = fileName.split(".").pop()?.toLowerCase();
         let contentType = "application/octet-stream"; // Default content type
 
-        // Set appropriate content type based on extension
-        switch (ext) {
-            case ".pdf":
-                contentType = "application/pdf";
-                break;
-            case ".jpg":
-            case ".jpeg":
-                contentType = "image/jpeg";
-                break;
-            case ".png":
-                contentType = "image/png";
-                break;
-            case ".gif":
-                contentType = "image/gif";
-                break;
-            case ".txt":
-                contentType = "text/plain";
-                break;
-            case ".doc":
-            case ".docx":
-                contentType = "application/msword";
-                break;
-            case ".xls":
-                contentType = "application/vnd.ms-excel";
-                break;
-            case ".xlsx":
-                contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-                break;
-            case ".zip":
-                contentType = "application/zip";
-                break;
+        // Map common file extensions to content types
+        const contentTypes: { [key: string]: string } = {
+            "pdf": "application/pdf",
+            "doc": "application/msword",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "xls": "application/vnd.ms-excel",
+            "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "gif": "image/gif",
+            "txt": "text/plain",
+            "csv": "text/csv",
+            "zip": "application/zip",
+            "rar": "application/x-rar-compressed",
+        };
+
+        if (ext && contentTypes[ext]) {
+            contentType = contentTypes[ext];
         }
 
         console.log("Serving file with content type:", contentType);
 
         // Create response with appropriate headers
-        const headers = new Headers({
-            "Content-Type": contentType,
-            "Content-Disposition": `attachment; filename=${path.basename(fullPath)}`,
-            "Content-Length": fileBuffer.length.toString(),
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0"
+        const response = new NextResponse(fileBuffer, {
+            headers: {
+                "Content-Type": contentType,
+                "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+                "Content-Length": fileBuffer.length.toString(),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            },
         });
 
-        return new NextResponse(fileBuffer, {
-            status: 200,
-            headers
-        });
+        return response;
 
     } catch (error) {
-        console.error("Error processing download:", error);
+        console.error("Error downloading file:", error);
         return NextResponse.json(
-            {
-                error: "Failed to process download request",
-                message: error instanceof Error ? error.message : String(error)
-            },
+            { error: "Failed to download file" },
             { status: 500 }
         );
     }

@@ -4,6 +4,8 @@ import { mkdir, unlink, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { updateTask, getTaskById } from '@/lib/services/task-service';
 
+const DOCUMENT_PATH = process.env.DOCUMENT_PATH;
+
 // Handle file upload
 export async function POST(
     request: NextRequest,
@@ -36,7 +38,7 @@ export async function POST(
         console.log(`Received ${files.length} files for upload`);
 
         // Ensure task directory exists
-        const uploadDir = join(process.cwd(), 'documents', taskId.toString());
+        const uploadDir = join(DOCUMENT_PATH!, "documents", taskId.toString());
         if (!existsSync(uploadDir)) {
             await mkdir(uploadDir, { recursive: true });
             console.log(`Created directory: ${uploadDir}`);
@@ -62,9 +64,9 @@ export async function POST(
                 // Add to uploaded files
                 const fileInfo = {
                     name: fileName,
-                    path: `/documents/${taskId}/${fileName}`,
+                    path: filePath,
                     type: file.type,
-                    size: `${Math.round(file.size / 1024)} KB`
+                    size: file.size
                 };
                 uploadedFiles.push(fileInfo);
                 console.log(`Added file info: ${JSON.stringify(fileInfo)}`);
@@ -140,7 +142,7 @@ export async function DELETE(
         }
 
         // Delete the file from disk
-        const filePath = join(process.cwd(), 'documents', taskId.toString(), fileName);
+        const filePath = join(DOCUMENT_PATH!, 'documents', taskId.toString(), fileName);
         if (existsSync(filePath)) {
             await unlink(filePath);
         }

@@ -133,16 +133,15 @@ export async function getTaskById(id: number) {
     return foundTask;
 }
 
-async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ name: string; path: string; type: string }>> {
-    const uploadDir = join(DOCUMENT_PATH!, "documents", taskId.toString());
+async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ name: string; path: string; type: string; size: number }>> {
+    const uploadDir = join(DOCUMENT_PATH!, 'documents', taskId.toString());
 
     // Create task directory if it doesn't exist
     if (!existsSync(uploadDir)) {
         await mkdir(uploadDir, { recursive: true });
     }
 
-    const savedFiles: Array<{ name: string; path: string; type: string }> = [];
-
+    const savedFiles: Array<{ name: string; path: string; type: string; size: number }> = [];
 
     for (const file of files) {
         const bytes = await file.arrayBuffer();
@@ -151,11 +150,14 @@ async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ n
         const filePath = join(uploadDir, fileName);
 
         await writeFile(filePath, buffer);
-        savedFiles.push({
+        const fileInfo = {
             name: fileName,
-            path: `/documents/${taskId}/${fileName}`,
-            type: file.type
-        });
+            path: filePath,
+            type: file.type,
+            size: file.size
+        };
+        savedFiles.push(fileInfo);
+        console.log(`Added file info: ${JSON.stringify(fileInfo)}`);
     }
 
     return savedFiles;
@@ -225,7 +227,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
 
 export async function updateTask(id: number, givenTask: Task, files?: FileList) {
     console.log("updateTask called with id:", id, "and task:", givenTask);
-    
+
     const foundTask = await getTaskById(id);
 
     if (!foundTask) {
@@ -236,15 +238,16 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
     const { id: tmpId, createdAt, updatedAt, ...props } = givenTask;
 
     // Handle file uploads if provided
-    let savedFiles: Array<{ name: string; path: string; type: string; size?: string }> = 
+    let savedFiles: Array<{ name: string; path: string; type: string; size?: string }> =
         (foundTask.files || []) as Array<{ name: string; path: string; type: string; size?: string }>;
-    
+
     console.log("Current files:", savedFiles);
-    
+
     if (files && files.length > 0) {
         console.log(`Processing ${files.length} new files in updateTask`);
         const newFiles = await handleTaskFiles(id, Array.from(files));
-        savedFiles = [...savedFiles, ...newFiles];
+        const convertedNewFiles = newFiles.map(file => ({ ...file, size: file.size.toString() }));
+        savedFiles = [...savedFiles, ...convertedNewFiles];
         console.log("Files after adding new uploads:", savedFiles);
     }
 
@@ -353,7 +356,7 @@ export async function deleteTaskFiles(taskId: number, fileNames: string[]) {
     }
 
     // Update the task's files array
-    const remainingFiles = ((task.files || []) as Array<{ name: string; path: string; type: string }>).filter(
+    const remainingFiles = ((task.files || []) as Array<{ name: string; path: string; type: string; size: number }>).filter(
         (file) => !fileNames.includes(file.name)
     );
 

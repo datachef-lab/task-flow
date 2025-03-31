@@ -19,6 +19,8 @@ export const userModel = pgTable("users", {
     email: varchar({ length: 255 }).notNull().unique(),
     whatsappNumber: varchar("whatsapp_number", { length: 255 }).notNull(),
     isAdmin: boolean("is_admin").default(false),
+    password: varchar({ length: 255 }),
+    picture: varchar({ length: 1000 }),
     disabled: boolean().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),

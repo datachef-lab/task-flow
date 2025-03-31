@@ -15,8 +15,8 @@ import {
 import { Task, User } from "@/db/schema";
 import { format } from "date-fns";
 import { Textarea } from "../ui/textarea";
-import { useUser } from "@clerk/nextjs";
 import { Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 type TaskFormProps = {
   task?: Task;
@@ -32,7 +32,7 @@ type TaskFile = {
 
 export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
   const router = useRouter();
-  const { user: clerkUser } = useUser();
+  const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
   const [users, setUsers] = useState<User[]>([]);
   const [createdUser, setCreatedUsers] = useState<User>();
@@ -40,6 +40,7 @@ export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
 
   const [formData, setFormData] = useState<Partial<Task>>({
     description: task?.description || "",
+    createdUserId: currentUser?.id as number,
     dueDate: task?.dueDate
       ? format(new Date(task.dueDate), "yyyy-MM-dd")
       : undefined,
@@ -54,13 +55,10 @@ export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
       const data = await response.json();
       setUsers(data.users);
 
-      const tmpUser = (data.users as User[]).find(
-        (ele) => ele.email === clerkUser?.emailAddresses[0].emailAddress
-      );
-      setCreatedUsers(tmpUser!);
+      setCreatedUsers(currentUser!);
       setFormData((prev) => ({
         ...prev,
-        createdUserId: tmpUser!.id as number,
+        createdUserId: currentUser!.id as number,
       }));
     };
 
