@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyToken, generateAccessToken } from "@/lib/auth";
+import { jwtVerify } from "jose";
 import { getUserById } from "@/lib/services/user-service";
+import { SignJWT } from "jose";
 
 export async function GET() {
     try {
@@ -17,16 +18,12 @@ export async function GET() {
         }
 
         // Verify the refresh token
-        const payload = verifyToken(refreshToken);
-        if (!payload || !payload.userId) {
-            return NextResponse.json(
-                { error: "Invalid refresh token" },
-                { status: 401 }
-            );
-        }
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+        const { payload } = await jwtVerify(refreshToken, secret);
+        const userId = payload.sub as string;
 
         // Get user details
-        const user = await getUserById(payload.userId as number);
+        const user = await getUserById(Number(userId));
         if (!user) {
             return NextResponse.json(
                 { error: "User not found" },
@@ -35,7 +32,11 @@ export async function GET() {
         }
 
         // Generate new access token
-        const accessToken = generateAccessToken(user.id);
+        const accessToken = await new SignJWT({ userId: user.id })
+            .setProtectedHeader({ alg: "HS256" })
+            .setIssuedAt()
+            .setExpirationTime("1h")
+            .sign(secret);
 
         return NextResponse.json({
             accessToken,
@@ -47,7 +48,7 @@ export async function GET() {
             },
         });
     } catch (error) {
-        console.error("Error in /auth/me:", error);
+        console.error("Error in /api/auth/me:", error);
         return NextResponse.json(
             { error: "Failed to verify session" },
             { status: 500 }
