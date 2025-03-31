@@ -71,10 +71,15 @@ interface TaskListProps {
     | "overdue"
     | "date_extension"
     | "on_hold"
-    | "assigne_by_me"
-    | "assigne_to_me";
+    | "assigned_by_me"
+    | "assigned_to_me";
   users: User[];
   onSubmit: (type: "add" | "edit", task: Task) => Promise<void>;
+  currentPage: number;
+  isLoading: boolean;
+  totalPages: number;
+  totalTaskCount?: number; // The total number of tasks on the server
+  onPageChange: (page: number) => void;
   onTaskDelete: (taskId: number) => Promise<void>;
 }
 
@@ -82,6 +87,11 @@ export function TaskList({
   filter,
   users,
   allTasks,
+  currentPage,
+  isLoading,
+  totalPages,
+  totalTaskCount,
+  onPageChange,
   onSubmit,
   onTaskDelete,
 }: TaskListProps) {
@@ -95,7 +105,6 @@ export function TaskList({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<number | null>(null);
@@ -215,8 +224,8 @@ export function TaskList({
         return !!task.requestedDate && !!task.requestDateExtensionReason;
       if (filter === "on_hold")
         return !task.completed && task.status === "on_hold";
-      if (filter === "assigne_by_me") return task.createdUserId === user?.id;
-      if (filter === "assigne_to_me") return task.assignedUserId === user?.id;
+      if (filter === "assigned_by_me") return task.createdUserId === user?.id;
+      if (filter === "assigned_to_me") return task.assignedUserId === user?.id;
       return true;
     });
   }
@@ -274,16 +283,14 @@ export function TaskList({
     });
   }
 
-  // Pagination logic
-  const totalTasks = filteredTasks.length;
-  const totalPages = Math.ceil(totalTasks / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, totalTasks);
-  const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+  // Use totalTaskCount from the server if provided, otherwise use the local filtered count
+  const totalTasks =
+    totalTaskCount !== undefined ? totalTaskCount : filteredTasks.length;
+  const displayedTasks = filteredTasks;
 
   // Handle page change
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    onPageChange(page);
   };
 
   const noTasksMessage = () => {
@@ -503,7 +510,7 @@ export function TaskList({
       </div>
 
       {/* Tasks Table */}
-      {filteredTasks.length === 0 ? (
+      {displayedTasks.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -590,7 +597,7 @@ export function TaskList({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTasks.map((task, index) => {
+                {displayedTasks.map((task, index) => {
                   const isOverdue =
                     task.dueDate &&
                     !task.completed &&
@@ -791,7 +798,7 @@ export function TaskList({
                   value={pageSize.toString()}
                   onValueChange={(value) => {
                     setPageSize(Number(value));
-                    setCurrentPage(1); // Reset to first page when changing page size
+                    handlePageChange(1); // Reset to page 1 when changing page size
                   }}
                 >
                   <SelectTrigger className="h-8 w-[70px] bg-white border-slate-200 focus:ring-indigo-500">
@@ -874,10 +881,12 @@ export function TaskList({
               <div className="text-sm text-slate-500 text-center sm:text-right">
                 Showing{" "}
                 <span className="font-medium text-slate-900">
-                  {Math.min(startIndex + 1, totalTasks)}
+                  {totalTasks === 0 ? 0 : (currentPage - 1) * pageSize + 1}
                 </span>{" "}
                 to{" "}
-                <span className="font-medium text-slate-900">{endIndex}</span>{" "}
+                <span className="font-medium text-slate-900">
+                  {Math.min(currentPage * pageSize, totalTasks)}
+                </span>{" "}
                 of{" "}
                 <span className="font-medium text-slate-900">{totalTasks}</span>{" "}
                 results

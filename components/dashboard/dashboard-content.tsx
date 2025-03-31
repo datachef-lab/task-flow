@@ -10,6 +10,8 @@ import {
   BarChart3,
   PieChart,
   PauseCircle,
+  UserPlus,
+  UserCheck,
 } from "lucide-react";
 import {
   Card,
@@ -28,9 +30,14 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  getAllTasks,
+  getTasksAssignedByMe,
+  getTasksAssignedToMe,
+} from "@/lib/services/task-service";
 
 type DashboardContentProps = {
-  initialTasks: Task[];
   users: User[];
   onSubmit: (
     type: "add" | "edit",
@@ -39,68 +46,128 @@ type DashboardContentProps = {
   ) => Promise<void>;
 };
 
+type ResponseData = {
+  tasks: Task[];
+  totalPages: number;
+  currentPage: number;
+  stats: {
+    totalTasksCount: number;
+    totalCompletedTasksCount: number;
+    pending: number;
+    overdue: number;
+  };
+};
+
 type TaskStats = {
-  totalTasks: number;
-  completedTasks: number;
-  pendingTasks: number;
-  overdueTasks: number;
+  totalTasksCount: number;
+  totalCompletedTasksCount: number;
+  pending: number;
+  overdue: number;
   dateExtensionRequests: number;
   onHoldTasks: number;
 };
 
-export function DashboardContent({
-  users,
-  initialTasks,
-  onSubmit,
-}: DashboardContentProps) {
+const topLevelTabArr = ["Assign By Me", "Assign To Me", "Assign By Everyone"];
+
+export function DashboardContent({ users, onSubmit }: DashboardContentProps) {
+  const { user } = useAuth();
+  const [topLevelTab, setTopLevelTab] = useState<string>("Assign By Me");
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [activeTab, setActiveTab] = useState<
-    "all" | "pending" | "completed" | "overdue" | "date_extension" | "on_hold"
+    | "all"
+    | "pending"
+    | "completed"
+    | "overdue"
+    | "date_extension"
+    | "on_hold"
+    | "assigned_by_me"
+    | "assigned_to_me"
   >("all");
   const [stats, setStats] = useState<TaskStats>({
-    totalTasks: 0,
-    completedTasks: 0,
-    pendingTasks: 0,
-    overdueTasks: 0,
+    totalTasksCount: 0,
+    totalCompletedTasksCount: 0,
+    pending: 0,
+    overdue: 0,
     dateExtensionRequests: 0,
     onHoldTasks: 0,
   });
 
-  // Update tasks when initialTasks changes
+  const fetchTasks = useCallback(
+    async (page: number = 1) => {
+      if (!user?.id && topLevelTab !== "Assign By Everyone") return;
+
+      setIsLoading(true);
+      try {
+        let response: ResponseData | undefined;
+        const pageSize = 10;
+
+        if (topLevelTab === "Assign By Me" && user?.id) {
+          response = await getTasksAssignedByMe(user.id, page, pageSize);
+        } else if (topLevelTab === "Assign To Me" && user?.id) {
+          response = await getTasksAssignedToMe(user.id, page, pageSize);
+        } else {
+          response = await getAllTasks(page, pageSize);
+        }
+
+        console.log("in fetchTasks(), response:", response, ", page:", page);
+
+        if (!response) {
+          throw new Error("No response from server");
+        }
+
+        setTasks(response.tasks);
+        setTotalPages(response.totalPages);
+
+        // Calculate additional stats from the tasks
+        const dateExtensionRequests = response.tasks.filter(
+          (task) => !!task.requestedDate && !!task.requestDateExtensionReason
+        ).length;
+
+        const onHoldTasks = response.tasks.filter(
+          (task) => !task.completed && task.status === "on_hold"
+        ).length;
+
+        // Manually calculate local stats for date-related stats to handle null dueDate
+        const today = new Date().toISOString().split("T")[0];
+        const pending = response.tasks.filter(
+          (task) => !task.completed && task.dueDate && task.dueDate >= today
+        ).length;
+
+        const overdue = response.tasks.filter(
+          (task) => !task.completed && task.dueDate && task.dueDate < today
+        ).length;
+
+        // Use API stats for counts but local calculations for date-dependent stats
+        setStats({
+          totalTasksCount: response.stats.totalTasksCount,
+          totalCompletedTasksCount: response.stats.totalCompletedTasksCount,
+          pending: response.stats.pending,
+          overdue: response.stats.overdue,
+          dateExtensionRequests,
+          onHoldTasks,
+        });
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        toast.error("Failed to fetch tasks");
+        setTasks([]);
+        setTotalPages(1);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user?.id, topLevelTab]
+  );
+
+  // Fetch tasks when topLevelTab or activeTab changes
   useEffect(() => {
-    setTasks(initialTasks);
-  }, [initialTasks]);
-
-  // Calculate stats from tasks
-  useEffect(() => {
-    const calculateStats = () => {
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter((task) => task.completed).length;
-      const pendingTasks = tasks.filter((task) => !task.completed).length;
-      const overdueTasks = tasks.filter(
-        (task) =>
-          !task.completed && task.dueDate && new Date(task.dueDate) < new Date()
-      ).length;
-      const dateExtensionRequests = tasks.filter(
-        (task) => !!task.requestedDate && !!task.requestDateExtensionReason
-      ).length;
-      const onHoldTasks = tasks.filter(
-        (task) => !task.completed && task.status === "on_hold"
-      ).length;
-
-      setStats({
-        totalTasks,
-        completedTasks,
-        pendingTasks,
-        overdueTasks,
-        dateExtensionRequests,
-        onHoldTasks,
-      });
-    };
-
-    calculateStats();
-  }, [tasks]);
+    fetchTasks(1);
+    setCurrentPage(1);
+  }, [topLevelTab, activeTab, fetchTasks]);
 
   const handleSubmit = async (
     type: "add" | "edit",
@@ -108,18 +175,13 @@ export function DashboardContent({
     files?: FileList
   ) => {
     try {
-      // Show loading toast
       const toastId = toast.loading(
         type === "add" ? "Creating task..." : "Updating task..."
       );
 
-      // Call the API
       await onSubmit(type, task, files);
 
-      // Update local state
       if (type === "add") {
-        // For now, we'll rely on router refresh instead of local state update
-        // since we don't have the ID of the new task
         router.refresh();
       } else {
         setTasks((prev) =>
@@ -127,7 +189,6 @@ export function DashboardContent({
         );
       }
 
-      // Show success toast
       toast.success(
         type === "add"
           ? "Task created successfully"
@@ -144,7 +205,6 @@ export function DashboardContent({
 
   const handleTaskDelete = async (taskId: number) => {
     try {
-      // Optimistically update the UI
       setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
 
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -156,10 +216,8 @@ export function DashboardContent({
       }
 
       toast.success("Task deleted successfully");
-      // Refresh the page data
       router.refresh();
     } catch (error) {
-      // Rollback on error
       setTasks((prevTasks) => [
         ...prevTasks,
         tasks.find((t) => t.id === taskId)!,
@@ -168,10 +226,20 @@ export function DashboardContent({
     }
   };
 
+  const handlePageChange = (page: number) => {
+    console.log("in handlePageChange(),", page);
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      fetchTasks(page);
+    }
+  };
+
   // Calculate completion rate percentage
   const completionRate =
-    stats.totalTasks > 0
-      ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
+    stats.totalTasksCount > 0
+      ? Math.round(
+          (stats.totalCompletedTasksCount / stats.totalTasksCount) * 100
+        )
       : 0;
 
   return (
@@ -189,6 +257,30 @@ export function DashboardContent({
           <TaskButtonWrapper onSubmit={handleSubmit} />
         </DashboardHeader>
       </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full"
+      >
+        <ul className="flex border-b pb-5">
+          {topLevelTabArr.map((tab) => (
+            <li
+              key={tab}
+              onClick={() => setTopLevelTab(tab)}
+              className={`p-2 cursor-pointer border rounded-md ${
+                topLevelTab === tab
+                  ? "border-slate-300 bg-green-200"
+                  : "border-transparent"
+              }
+              hover:border-slate-300
+              `}
+            >
+              {tab}
+            </li>
+          ))}
+        </ul>
+      </motion.div>
 
       {/* Stats Cards */}
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5 w-full">
@@ -204,7 +296,7 @@ export function DashboardContent({
             </CardHeader>
             <CardContent className="p-4">
               <div className="text-3xl font-bold text-slate-900">
-                {stats.totalTasks}
+                {stats.totalTasksCount}
               </div>
               <p className="text-xs text-slate-500 mt-1">Tasks in the system</p>
             </CardContent>
@@ -224,7 +316,7 @@ export function DashboardContent({
             <CardContent className="p-4">
               <div className="flex items-baseline gap-2">
                 <div className="text-3xl font-bold text-slate-900">
-                  {stats.completedTasks}
+                  {stats.totalCompletedTasksCount}
                 </div>
                 <div className="text-sm font-medium text-emerald-600">
                   {completionRate}%
@@ -247,7 +339,7 @@ export function DashboardContent({
             </CardHeader>
             <CardContent className="p-4">
               <div className="text-3xl font-bold text-slate-900">
-                {stats.pendingTasks}
+                {stats.pending}
               </div>
               <p className="text-xs text-slate-500 mt-1">Tasks in progress</p>
             </CardContent>
@@ -266,7 +358,7 @@ export function DashboardContent({
             </CardHeader>
             <CardContent className="p-4">
               <div className="text-3xl font-bold text-slate-900">
-                {stats.overdueTasks}
+                {stats.overdue}
               </div>
               <p className="text-xs text-slate-500 mt-1">Tasks past deadline</p>
             </CardContent>
@@ -378,13 +470,13 @@ export function DashboardContent({
               Extensions
             </TabsTrigger>
             <TabsTrigger
-              value="assigne_by_me"
+              value="assigned_by_me"
               className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-sm h-auto py-2.5 text-sm font-medium"
             >
               Assigne by me
             </TabsTrigger>
             <TabsTrigger
-              value="assigne_to_me"
+              value="assigned_to_me"
               className="rounded-md data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-sm h-auto py-2.5 text-sm font-medium"
             >
               Assigne to me
@@ -400,6 +492,11 @@ export function DashboardContent({
                 filter={undefined}
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                totalTaskCount={stats.totalTasksCount}
               />
             </TabsContent>
             <TabsContent value="pending" className="m-0 pt-2 w-full">
@@ -409,6 +506,11 @@ export function DashboardContent({
                 filter="pending"
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                totalTaskCount={stats.totalTasksCount}
               />
             </TabsContent>
             <TabsContent value="completed" className="m-0 pt-2 w-full">
@@ -418,6 +520,11 @@ export function DashboardContent({
                 filter="completed"
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                totalTaskCount={stats.totalTasksCount}
               />
             </TabsContent>
             <TabsContent value="overdue" className="m-0 pt-2 w-full">
@@ -427,6 +534,11 @@ export function DashboardContent({
                 filter="overdue"
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                totalTaskCount={stats.totalTasksCount}
               />
             </TabsContent>
             <TabsContent value="date_extension" className="m-0 pt-2 w-full">
@@ -436,6 +548,11 @@ export function DashboardContent({
                 filter="date_extension"
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                totalTaskCount={stats.totalTasksCount}
               />
             </TabsContent>
             <TabsContent value="on_hold" className="m-0 pt-2 w-full">
@@ -445,24 +562,11 @@ export function DashboardContent({
                 filter="on_hold"
                 onSubmit={handleSubmit}
                 onTaskDelete={handleTaskDelete}
-              />
-            </TabsContent>
-            <TabsContent value="assigne_by_me" className="mt-4">
-              <TaskList
-                users={users}
-                allTasks={tasks}
-                filter="assigne_by_me"
-                onSubmit={handleSubmit}
-                onTaskDelete={handleTaskDelete}
-              />
-            </TabsContent>
-            <TabsContent value="assigne_to_me" className="mt-4">
-              <TaskList
-                users={users}
-                allTasks={tasks}
-                filter="assigne_to_me"
-                onSubmit={handleSubmit}
-                onTaskDelete={handleTaskDelete}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                isLoading={isLoading}
+                totalTaskCount={stats.totalTasksCount}
               />
             </TabsContent>
           </div>

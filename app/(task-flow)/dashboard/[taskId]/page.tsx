@@ -1845,9 +1845,9 @@ export default function TaskPage() {
       if (!response.ok) {
         throw new Error("Failed to delete task");
       }
-      toast.success("Task deleted successfully");
+    toast.success("Task deleted successfully");
       router.refresh();
-      router.push("/dashboard");
+    router.push("/dashboard");
     } catch (error) {
       console.error("Error deleting task:", error);
       toast.error("Failed to delete task");
@@ -1995,10 +1995,10 @@ export default function TaskPage() {
         >
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <Badge
-                variant="outline"
+                <Badge
+                  variant="outline"
                 className="text-xs font-bold bg-indigo-100 border-indigo-200 text-indigo-700 px-2.5 py-0.5 rounded-full"
-              >
+                >
                 {task?.abbreviation}
               </Badge>
               {task?.completed ? (
@@ -2033,7 +2033,7 @@ export default function TaskPage() {
               <div className="flex items-center gap-1">
                 <UserIcon className="h-4 w-4 text-slate-400" />
                 <span>{assignedUser?.name}</span>
-              </div>
+          </div>
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4 text-slate-400" />
                 <span>
@@ -2074,14 +2074,14 @@ export default function TaskPage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Button
-                    variant="outline"
-                    onClick={handleDelete}
+            <Button
+              variant="outline"
+              onClick={handleDelete}
                     className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors shadow-sm h-10"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </Button>
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
                 </motion.div>
               )}
           </div>
@@ -2157,7 +2157,7 @@ export default function TaskPage() {
                         <p className="leading-relaxed text-slate-700 p-3 bg-amber-50 rounded-md border border-amber-100">
                           {task.requestDateExtensionReason}
                         </p>
-                      </div>
+        </div>
 
                       {/* Only show approve/reject buttons to the task creator */}
                       {createdUser?.email === currentUser?.email && (
@@ -2193,11 +2193,11 @@ export default function TaskPage() {
             >
               <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
                 <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
-                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-indigo-500" />
                     Special Note
-                  </CardTitle>
-                </CardHeader>
+                </CardTitle>
+              </CardHeader>
                 <CardContent className="p-6">
                   <p
                     className={`leading-relaxed ${
@@ -2206,8 +2206,8 @@ export default function TaskPage() {
                   >
                     {task?.remarks || "No special notes for this task."}
                   </p>
-                </CardContent>
-              </Card>
+              </CardContent>
+            </Card>
             </motion.div>
 
             {/* Attachments Section */}
@@ -2218,14 +2218,14 @@ export default function TaskPage() {
             >
               <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
                 <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
-                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
                     <Paperclip className="h-5 w-5 text-indigo-500" />
-                    Attachments
-                  </CardTitle>
+                  Attachments
+                </CardTitle>
                   <CardDescription className="text-slate-500 text-sm mt-1">
                     Documents and resources for this task
                   </CardDescription>
-                </CardHeader>
+              </CardHeader>
                 <CardContent className="p-6">
                   {/* File Upload Section - only shown to assignee when task is not completed and not on hold */}
                   {assignedUser?.email === currentUser?.email &&
@@ -2334,11 +2334,11 @@ export default function TaskPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {task.files && (task.files as TaskFile[]).length > 0 ? (
                       (task.files as TaskFile[]).map((file, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3, delay: index * 0.1 }}
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
                           whileHover={{
                             scale: 1.02,
                             boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
@@ -2350,12 +2350,12 @@ export default function TaskPage() {
                             <p className="text-sm font-medium text-slate-800 truncate hover:text-indigo-600">
                               {file.name}
                             </p>
-                            <p className="text-xs text-slate-500 capitalize">
+                        <p className="text-xs text-slate-500 capitalize">
                               {getFileType(file.name)} ·{" "}
                               {file.size ||
                                 (file.type && file.type.split("/")[1])}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
                           <div className="flex gap-1">
                             <Button
                               variant="ghost"
@@ -2366,22 +2366,22 @@ export default function TaskPage() {
                               title="Download file"
                               className="h-8 w-8 p-0 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-full"
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M12 17V3" />
-                                <path d="m6 11 6 6 6-6" />
-                                <path d="M19 21H5" />
-                              </svg>
-                            </Button>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M12 17V3" />
+                            <path d="m6 11 6 6 6-6" />
+                            <path d="M19 21H5" />
+                          </svg>
+                      </Button>
 
                             {/* Delete button - only show for task assignee when task is not on hold and not completed */}
                             {assignedUser?.email === currentUser?.email &&
@@ -2449,7 +2449,7 @@ export default function TaskPage() {
                                 </Button>
                               )}
                           </div>
-                        </motion.div>
+                    </motion.div>
                       ))
                     ) : (
                       <div className="col-span-full flex flex-col items-center justify-center p-10 text-center border border-dashed border-slate-300 rounded-lg bg-slate-50">
@@ -2471,9 +2471,9 @@ export default function TaskPage() {
                           )}
                       </div>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
             </motion.div>
           </div>
 
@@ -2487,26 +2487,26 @@ export default function TaskPage() {
               >
                 <Card className="overflow-hidden border-slate-200 shadow-md hover:shadow-lg transition-shadow">
                   <CardHeader className="bg-gradient-to-r from-slate-50 to-white pb-4 border-b border-slate-200 px-6 py-4">
-                    <CardTitle className="text-lg text-slate-800">
+                <CardTitle className="text-lg text-slate-800">
                       Task Actions
-                    </CardTitle>
+                </CardTitle>
                     <CardDescription className="text-slate-500 text-sm mt-1">
                       Manage task status and delegation
                     </CardDescription>
-                  </CardHeader>
+              </CardHeader>
                   <CardContent className="p-6">
                     {task.completed ? (
-                      <div className="space-y-4">
+                <div className="space-y-4">
                         <div className="rounded-lg p-4 bg-emerald-50 border border-emerald-200 text-emerald-800">
                           <div className="flex items-center gap-2 mb-2">
                             <CheckCircle className="h-5 w-5 text-emerald-600" />
                             <h3 className="font-medium">Task Completed</h3>
-                          </div>
+                    </div>
                           <p className="text-sm">
                             This task has been marked as complete. You can mark
                             it as incomplete if needed.
                           </p>
-                        </div>
+                  </div>
 
                         <motion.div
                           whileHover={{ scale: 1.01 }}
@@ -2527,7 +2527,7 @@ export default function TaskPage() {
                             Mark as Incomplete
                           </Button>
                         </motion.div>
-                      </div>
+                    </div>
                     ) : (
                       <div className="space-y-4">
                         {/* On hold / Resume task button */}
@@ -2615,7 +2615,7 @@ export default function TaskPage() {
                                   >
                                     Confirm
                                   </Button>
-                                </div>
+                    </div>
                               </DialogContent>
                             </Dialog>
                           )}
@@ -2700,14 +2700,14 @@ export default function TaskPage() {
                                           <div className="flex items-center">
                                             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-medium mr-2">
                                               {user.name.charAt(0)}
-                                            </div>
+                    </div>
                                             {user.name}
-                                          </div>
+                    </div>
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                </div>
+                  </div>
                               </DialogContent>
                             </Dialog>
                           </motion.div>
@@ -2715,8 +2715,8 @@ export default function TaskPage() {
 
                         {/* Request deadline extension button - only shown if task is not on hold and no existing request */}
                         {task.status !== "on_hold" && (
-                          <Button
-                            variant="outline"
+                  <Button
+                    variant="outline"
                             onClick={() => setIsEditing((prev) => !prev)}
                             disabled={!!task.requestDateExtensionReason}
                             className={`w-full border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 shadow-md flex items-center justify-center h-12 rounded-md text-base font-medium ${
@@ -2726,9 +2726,9 @@ export default function TaskPage() {
                           >
                             <AlertCircle className="w-5 h-5 mr-2" />
                             Request Deadline Extension
-                          </Button>
+                  </Button>
                         )}
-                      </div>
+                </div>
                     )}
 
                     {/* Extension request form */}
@@ -2736,57 +2736,57 @@ export default function TaskPage() {
                       !task.requestDateExtensionReason &&
                       !task.completed &&
                       task.status !== "on_hold" && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          transition={{ duration: 0.3 }}
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    transition={{ duration: 0.3 }}
                           className="mt-6 space-y-4 p-5 rounded-lg border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 shadow-inner"
-                        >
+                  >
                           <h3 className="font-medium text-amber-800 flex items-center gap-2 text-base">
                             <AlertCircle className="h-5 w-5" />
-                            Request Due Date Extension
-                          </h3>
+                      Request Due Date Extension
+                    </h3>
                           <div className="space-y-4">
-                            <div>
+                      <div>
                               <Label
                                 htmlFor="newDueDate"
                                 className="text-amber-800 mb-1.5 block text-sm font-medium"
                               >
-                                New Due Date
-                              </Label>
-                              <Input
-                                id="newDueDate"
-                                type="date"
-                                value={newDueDate}
-                                onChange={(e) => setNewDueDate(e.target.value)}
+                          New Due Date
+                        </Label>
+                        <Input
+                          id="newDueDate"
+                          type="date"
+                          value={newDueDate}
+                          onChange={(e) => setNewDueDate(e.target.value)}
                                 className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm h-10 text-sm w-full"
-                              />
-                            </div>
-                            <div>
-                              <Label
-                                htmlFor="extensionReason"
+                        />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor="extensionReason"
                                 className="text-amber-800 mb-1.5 block text-sm font-medium"
-                              >
-                                Reason for Extension
-                              </Label>
-                              <Textarea
-                                id="extensionReason"
-                                value={extensionReason}
+                        >
+                          Reason for Extension
+                        </Label>
+                        <Textarea
+                          id="extensionReason"
+                          value={extensionReason}
                                 onChange={(e) =>
                                   setExtensionReason(e.target.value)
                                 }
                                 placeholder="Please explain why you need more time to complete this task..."
                                 className="border-amber-200 focus-visible:ring-amber-500 bg-white shadow-sm min-h-[120px] text-sm w-full"
-                              />
-                            </div>
-                          </div>
+                        />
+                      </div>
+                    </div>
                           <motion.div
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
                             className="pt-2"
                           >
-                            <Button
-                              onClick={handleRequestExtension}
+                    <Button
+                      onClick={handleRequestExtension}
                               disabled={!newDueDate || !extensionReason}
                               className={`w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md h-11 font-medium ${
                                 (!newDueDate || !extensionReason) &&
@@ -2795,12 +2795,12 @@ export default function TaskPage() {
                             >
                               <Calendar className="w-5 h-5 mr-2" />
                               Submit Extension Request
-                            </Button>
+                    </Button>
                           </motion.div>
-                        </motion.div>
-                      )}
-                  </CardContent>
-                </Card>
+                  </motion.div>
+                )}
+              </CardContent>
+            </Card>
               </motion.div>
             )}
 

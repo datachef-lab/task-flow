@@ -11,32 +11,130 @@ import { deleteTaskDirectory, deleteTaskFile } from './file-service';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { emitNotification } from "@/lib/socket";
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
 const DOCUMENT_PATH = process.env.DOCUMENT_PATH;
 
-export async function getAllTasks(page: number = 1, size: number = 100) {
-    const offset = (page - 1) * size;
+let io: any = null;
 
-    const [tasks, totalTasks] = await Promise.all([
-        db.select().from(taskModel).limit(size).offset(offset).orderBy(desc(taskModel.createdAt)),
-        db.select({ count: count() }).from(taskModel),
-    ]);
-
-    const totalPages = Math.ceil(totalTasks[0].count / size);
-
-    return {
-        tasks,
-        currentPage: page,
-        totalPages,
-        totalTasks: totalTasks[0].count,
-    };
+export async function setSocketIO(ioInstance: any) {
+    io = ioInstance;
+    return { success: true };
 }
 
-export async function getPendingTasks(page: number = 1, size: number = 10) {
+export async function getStats(userId: number | undefined, type: "created" | "assigned") {
+    try {
+        const whereConditions = [];
+
+        if (userId) {
+
+            if (type === "created") {
+                whereConditions.push(eq(taskModel.createdUserId, userId));
+            }
+            else {
+                whereConditions.push(eq(taskModel.assignedUserId, userId));
+            }
+        }
+
+        const [result] = await db
+            .select({ count: count() })
+            .from(taskModel)
+            .where(and(...whereConditions));
+
+        const [result2] = await db
+            .select({ count: count() })
+            .from(taskModel)
+            .where(
+                and(
+                    eq(taskModel.completed, true),
+                    ...whereConditions
+                )
+            );
+
+        const [result3] = await db
+            .select({ count: count() })
+            .from(taskModel)
+            .where(
+                and(
+                    eq(taskModel.completed, false),
+                    gte(taskModel.dueDate, new Date().toISOString()),
+                    ...whereConditions,
+                )
+            );
+
+        const [result4] = await db
+            .select({ count: count() })
+            .from(taskModel)
+            .where(
+                and(
+                    eq(taskModel.completed, false),
+                    lt(taskModel.dueDate, new Date().toISOString()),
+                    ...whereConditions,
+                )
+            );
+
+        return {
+            totalTasksCount: result.count,
+            totalCompletedTasksCount: result2.count,
+            pending: result3.count,
+            overdue: result4.count,
+        };
+
+    } catch (error) {
+        console.error("Error fetching tasks:", error);
+        return {
+            totalTasksCount: -1,
+            totalCompletedTasksCount: -1,
+            pending: -1,
+            overdue: -1,
+        };
+    }
+}
+
+export async function getAllTasks(page: number = 1, pageSize: number = 10) {
+    try {
+        const offset = (page - 1) * pageSize;
+
+        const [tasks, totalCount] = await Promise.all([
+            db
+                .select()
+                .from(taskModel)
+                .orderBy(desc(taskModel.createdAt))
+                .limit(pageSize)
+                .offset(offset),
+            db.select({ count: count() }).from(taskModel),
+        ]);
+
+        const totalPages = Math.ceil(totalCount[0].count / pageSize);
+
+        const stats = await getStats(undefined, "assigned");
+        return {
+            tasks,
+            totalPages,
+            currentPage: page,
+            stats,
+        };
+    } catch (error) {
+        console.error("Error fetching all tasks:", error);
+        throw error;
+    }
+}
+
+export async function getPendingTasks(page: number = 1, size: number = 10, userId?: number, type?: "created" | "assigned") {
     const offset = (page - 1) * size;
     const today = new Date().toISOString().split('T')[0]; // Convert to YYYY-MM-DD
+
+    const whereConditions = []
+    if (userId) {
+        if (type === "created") {
+            whereConditions.push(eq(taskModel.createdUserId, userId));
+        }
+        else {
+            whereConditions.push(eq(taskModel.assignedUserId, userId));
+        }
+    }
 
     const [tasks, totalTasks] = await Promise.all([
         db.
@@ -45,6 +143,7 @@ export async function getPendingTasks(page: number = 1, size: number = 10) {
             .where(and(
                 eq(taskModel.completed, false),
                 gte(taskModel.dueDate, today),
+                ...whereConditions,
             ))
             .limit(size)
             .orderBy(desc(taskModel.id))
@@ -57,18 +156,30 @@ export async function getPendingTasks(page: number = 1, size: number = 10) {
 
     const totalPages = Math.ceil(totalTasks[0].count / size);
 
+    const stats = await getStats(userId, "assigned");
     return {
         tasks,
         currentPage: page,
         totalPages,
         totalTasks: totalTasks[0].count,
+        stats,
     };
 }
 
-export async function getOverdueTasks(page: number = 1, size: number = 10) {
+export async function getOverdueTasks(page: number = 1, size: number = 10, userId?: number, type?: "created" | "assigned") {
     const offset = (page - 1) * size;
     const today = new Date().toISOString().split('T')[0]; // Convert to YYYY-MM-DD
-    console.log("today:", today)
+
+    const whereConditions = []
+    if (userId) {
+        if (type === "created") {
+            whereConditions.push(eq(taskModel.createdUserId, userId));
+        }
+        else {
+            whereConditions.push(eq(taskModel.assignedUserId, userId));
+        }
+    }
+
     const [tasks, totalTasks] = await Promise.all([
         db.
             select()
@@ -76,6 +187,7 @@ export async function getOverdueTasks(page: number = 1, size: number = 10) {
             .where(and(
                 eq(taskModel.completed, false),
                 lt(taskModel.dueDate, today),
+                ...whereConditions,
             ))
             .orderBy(desc(taskModel.id))
             .limit(size)
@@ -88,22 +200,37 @@ export async function getOverdueTasks(page: number = 1, size: number = 10) {
 
     const totalPages = Math.ceil(totalTasks[0].count / size);
 
+    const stats = await getStats(userId, "assigned");
     return {
         tasks,
         currentPage: page,
         totalPages,
         totalTasks: totalTasks[0].count,
+        stats,
     };
 }
 
-export async function getCompletedTasks(page: number = 1, size: number = 10) {
+export async function getCompletedTasks(page: number = 1, size: number = 10, userId?: number, type?: "created" | "assigned") {
     const offset = (page - 1) * size;
+
+    const whereConditions = []
+    if (userId) {
+        if (type === "created") {
+            whereConditions.push(eq(taskModel.createdUserId, userId));
+        }
+        else {
+            whereConditions.push(eq(taskModel.assignedUserId, userId));
+        }
+    }
 
     const [tasks, totalTasks] = await Promise.all([
         db.
             select()
             .from(taskModel)
-            .where(eq(taskModel.completed, true))
+            .where(and(
+                eq(taskModel.completed, true),
+                ...whereConditions,
+            ))
             .orderBy(desc(taskModel.id))
             .limit(size)
             .offset(offset),
@@ -112,11 +239,13 @@ export async function getCompletedTasks(page: number = 1, size: number = 10) {
 
     const totalPages = Math.ceil(totalTasks[0].count / size);
 
+    const stats = await getStats(userId, "assigned");
     return {
         tasks,
         currentPage: page,
         totalPages,
         totalTasks: totalTasks[0].count,
+        stats,
     };
 }
 
@@ -217,6 +346,19 @@ export async function createTask(givenTask: Task, files?: FileList) {
             newTask.dueDate?.toString() || 'default_date',
         ], "task_assigned");
 
+        // Emit notification for task creation
+        if (io) {
+            emitNotification(io, newTask.assignedUserId!, {
+                type: "task_created",
+                taskId: newTask.id,
+                taskTitle: newTask.description,
+                userId: newTask.createdUserId as number,
+                userName: "System", // You'll need to fetch the actual user name
+                timestamp: new Date(),
+                message: `New task "${newTask.description}" has been assigned to you`,
+            });
+        }
+
         return newTask;
     } catch (error) {
         console.error("Error creating task:", error);
@@ -283,6 +425,19 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
         taskId: updatedTask?.id as number,
         userId: updatedTask?.assignedUserId as number
     });
+
+    // Emit notification for status change
+    if (io) {
+        emitNotification(io, updatedTask?.assignedUserId as number, {
+            type: updatedTask?.completed ? "task_completed" : "task_updated",
+            taskId: updatedTask?.id as number,
+            taskTitle: updatedTask?.description,
+            userId: updatedTask?.createdUserId as number,
+            userName: "System", // You'll need to fetch the actual user name
+            timestamp: new Date(),
+            message: `Task "${updatedTask?.description}" has been ${updatedTask?.completed ? "completed" : "updated"}`,
+        });
+    }
 
     return updatedTask;
 }
@@ -434,11 +589,13 @@ export async function getTasksAssignedByMe(userId: number, page: number = 1, siz
 
     const totalPages = Math.ceil(totalTasks[0].count / size);
 
+    const stats = await getStats(userId, "created");
     return {
         tasks,
         currentPage: page,
         totalPages,
         totalTasks: totalTasks[0].count,
+        stats,
     };
 }
 
@@ -461,10 +618,118 @@ export async function getTasksAssignedToMe(userId: number, page: number = 1, siz
 
     const totalPages = Math.ceil(totalTasks[0].count / size);
 
+    const stats = await getStats(userId, "assigned");
     return {
         tasks,
         currentPage: page,
         totalPages,
         totalTasks: totalTasks[0].count,
+        stats,
     };
+}
+
+export async function updateTaskStatus(
+    taskId: number,
+    status: TaskStatus
+): Promise<Task> {
+    try {
+        const task = await db.task.update({
+            where: { id: taskId },
+            data: { status },
+        });
+
+        // Emit notification for status change
+        if (io) {
+            emitNotification(io, task.assignedUserId, {
+                type: status === "completed" ? "task_completed" : "task_updated",
+                taskId: task.id,
+                taskTitle: task.title,
+                userId: task.createdUserId,
+                userName: "System", // You'll need to fetch the actual user name
+                timestamp: new Date(),
+                message: `Task "${task.title}" has been ${status}`,
+            });
+        }
+
+        return task;
+    } catch (error) {
+        console.error("Error updating task status:", error);
+        throw error;
+    }
+}
+
+export async function requestDateExtension(
+    taskId: number,
+    requestedDate: Date,
+    reason: string
+): Promise<Task> {
+    try {
+        const task = await db.task.update({
+            where: { id: taskId },
+            data: {
+                requestedDate,
+                requestDateExtensionReason: reason,
+            },
+        });
+
+        // Emit notification for extension request
+        if (io) {
+            emitNotification(io, task.createdUserId, {
+                type: "task_extension_requested",
+                taskId: task.id,
+                taskTitle: task.title,
+                userId: task.assignedUserId,
+                userName: "System", // You'll need to fetch the actual user name
+                timestamp: new Date(),
+                message: `Date extension requested for task "${task.title}"`,
+            });
+        }
+
+        return task;
+    } catch (error) {
+        console.error("Error requesting date extension:", error);
+        throw error;
+    }
+}
+
+export async function handleDateExtensionRequest(
+    taskId: number,
+    approved: boolean
+): Promise<Task> {
+    try {
+        const task = await db.task.update({
+            where: { id: taskId },
+            data: {
+                ...(approved
+                    ? {
+                        dueDate: task.requestedDate,
+                        requestedDate: null,
+                        requestDateExtensionReason: null,
+                    }
+                    : {
+                        requestedDate: null,
+                        requestDateExtensionReason: null,
+                    }),
+            },
+        });
+
+        // Emit notification for extension request response
+        if (io) {
+            emitNotification(io, task.assignedUserId, {
+                type: approved ? "task_extension_approved" : "task_extension_rejected",
+                taskId: task.id,
+                taskTitle: task.title,
+                userId: task.createdUserId,
+                userName: "System", // You'll need to fetch the actual user name
+                timestamp: new Date(),
+                message: `Date extension request for task "${task.title}" has been ${approved ? "approved" : "rejected"
+                    }`,
+            });
+        }
+
+        return task;
+    } catch (error) {
+        console.error("Error handling date extension request:", error);
+        throw error;
+    }
 }

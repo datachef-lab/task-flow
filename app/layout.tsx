@@ -1,7 +1,11 @@
 import "@/lib/cronjob-scheduler";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/providers/auth-provider";
+import { SocketProvider } from "@/components/providers/socket-provider";
+import { Toaster } from "@/components/ui/toaster";
 
 import type { Metadata } from "next";
-import { Toaster } from "@/components/ui/sonner";
 import {
   ClerkProvider,
   SignInButton,
@@ -11,8 +15,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 
-import "./globals.css";
-import { AuthProvider } from "@/providers/auth-provider";
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Task Flow",
@@ -22,15 +25,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
         <AuthProvider>
-          {children}
-          <Toaster />
+          <SocketProvider>
+            {children}
+            <Toaster />
+          </SocketProvider>
         </AuthProvider>
       </body>
     </html>
