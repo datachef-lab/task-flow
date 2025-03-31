@@ -11,6 +11,7 @@ import { deleteTaskDirectory, deleteTaskFile } from './file-service';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { emitTaskNotification } from "../socket-server";
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
@@ -166,7 +167,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
     console.log("in create task,", props);
 
     try {
-        const abbreviation = await getAbbreviation(givenTask.priorityType);
+        const abbreviation = await getAbbreviation();
         const [newTask] = await db
             .insert(taskModel)
             .values({ ...props, abbreviation })
@@ -207,13 +208,16 @@ export async function createTask(givenTask: Task, files?: FileList) {
             `Task "${newTask.abbreviation}" has been assigned to you.`
         );
 
-        // TODO: Send the WhatsApp
+        // Send WhatsApp notification
         await sendWhatsAppMessage(assignedUser?.whatsappNumber as string, [
             assignedUser?.name as string,
             newTask.abbreviation || "default_user",
             createdUser?.name as string,
             newTask.dueDate?.toString() || 'default_date',
         ], "task_assigned");
+
+        // Emit socket notification for task creation
+        await emitTaskNotification('task_created', newTask);
 
         return newTask;
     } catch (error) {
@@ -225,7 +229,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
 
 export async function updateTask(id: number, givenTask: Task, files?: FileList) {
     console.log("updateTask called with id:", id, "and task:", givenTask);
-    
+
     const foundTask = await getTaskById(id);
 
     if (!foundTask) {
@@ -236,11 +240,11 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
     const { id: tmpId, createdAt, updatedAt, ...props } = givenTask;
 
     // Handle file uploads if provided
-    let savedFiles: Array<{ name: string; path: string; type: string; size?: string }> = 
+    let savedFiles: Array<{ name: string; path: string; type: string; size?: string }> =
         (foundTask.files || []) as Array<{ name: string; path: string; type: string; size?: string }>;
-    
+
     console.log("Current files:", savedFiles);
-    
+
     if (files && files.length > 0) {
         console.log(`Processing ${files.length} new files in updateTask`);
         const newFiles = await handleTaskFiles(id, Array.from(files));
@@ -268,6 +272,34 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
         console.log("Updated task in database:", savedTask);
         updatedTask = savedTask;
 
+        // Check for status changes and emit appropriate notifications
+        if (foundTask.completed !== updatedTask.completed && updatedTask.completed) {
+            // Task was marked as completed
+            await emitTaskNotification('task_completed', updatedTask);
+        }
+
+        if (foundTask.status !== 'on_hold' && updatedTask.status === 'on_hold') {
+            // Task was put on hold
+            await emitTaskNotification('task_on_hold', updatedTask);
+        }
+
+        if (!foundTask.requestDateExtensionReason && updatedTask.requestDateExtensionReason) {
+            // Extension was requested
+            await emitTaskNotification('extension_requested', updatedTask);
+        }
+
+        // Check if extension was approved
+        if (foundTask.requestedDate && !updatedTask.requestedDate &&
+            foundTask.dueDate !== updatedTask.dueDate && updatedTask.isRequestDateExtensionApproved) {
+            await emitTaskNotification('extension_approved', updatedTask);
+        }
+
+        // Check if extension was rejected
+        if (foundTask.requestedDate && !updatedTask.requestedDate &&
+            foundTask.dueDate === updatedTask.dueDate && !updatedTask.isRequestDateExtensionApproved) {
+            await emitTaskNotification('extension_rejected', updatedTask);
+        }
+
     } catch (error) {
         console.error("Error updating task in database:", error);
         return null;
@@ -284,7 +316,7 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
     return updatedTask;
 }
 
-export async function getAbbreviation(priority: "normal" | "medium" | "high") {
+export async function getAbbreviation() {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
@@ -307,8 +339,8 @@ export async function getAbbreviation(priority: "normal" | "medium" | "high") {
         .orderBy(sql`id DESC`)
         .limit(1);
 
-    // Generate abbreviation
-    const comp1 = priority.charAt(0).toUpperCase();
+    // Generate abbreviation without priority
+    const comp1 = "T"; // Fixed prefix 'T' for Task
     const comp2 = currentYear.toString().substring(2); // Only last 2 digits
     const comp3 = currentMonth.toString().padStart(2, '0');
     let comp4 = 1;

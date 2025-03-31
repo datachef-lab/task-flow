@@ -2,14 +2,7 @@ import "@/lib/cronjob-scheduler";
 
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
+import { AuthProvider } from "@/components/providers/auth-provider";
 
 import "./globals.css";
 
@@ -25,13 +18,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body>
+    <html lang="en">
+      <body>
+        <AuthProvider>
           {children}
           <Toaster />
-        </body>
-      </html>
-    </ClerkProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }

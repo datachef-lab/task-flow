@@ -192,7 +192,7 @@ export function TaskList({
           <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
             NORMAL
           </Badge>
-        );
+      );
     }
   };
 
@@ -590,7 +590,7 @@ export function TaskList({
 
                   return (
                     <TableRow
-                      key={task.id}
+            key={task.id}
                       className={`${
                         task.completed
                           ? "bg-slate-50/80"
