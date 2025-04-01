@@ -80,6 +80,8 @@ interface TaskListProps {
   totalPages: number;
   totalTaskCount?: number; // The total number of tasks on the server
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  pageSize: number;
   onTaskDelete: (taskId: number) => Promise<void>;
 }
 
@@ -92,30 +94,40 @@ export function TaskList({
   totalPages,
   totalTaskCount,
   onPageChange,
+  onPageSizeChange,
+  pageSize,
   onSubmit,
   onTaskDelete,
 }: TaskListProps) {
   const { user } = useAuth();
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>(allTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [completionLoading, setCompletionLoading] = useState<number | null>(
+    null
+  );
 
   // Pagination state
-  const [pageSize, setPageSize] = useState(10);
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<number | null>(null);
 
   useEffect(() => {
-    setTasks(allTasks);
+    // Clean state update: only update when allTasks changes
+    if (allTasks && JSON.stringify(allTasks) !== JSON.stringify(tasks)) {
+      setTasks(allTasks);
+    }
     setCurrentDate(new Date());
-  }, [allTasks]);
+  }, [allTasks, currentPage]);
 
+  // Toggle task completion function
   const toggleTaskCompletion = async (taskId: number, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent row click
+    if (completionLoading === taskId) return; // Prevent multiple requests
+
     try {
       const task = tasks.find((t) => t.id === taskId);
       if (!task) return;
@@ -128,16 +140,51 @@ export function TaskList({
 
       if (!isConfirmed) return;
 
-      // API call
-      const updatedTask = { ...task, completed: !task.completed };
-      await onSubmit("edit", updatedTask);
+      // Show loading state
+      setCompletionLoading(taskId);
 
-      // Optimistic update
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
-      toast.success("Task updated successfully");
-      router.refresh();
+      // Optimistically update the UI
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, completed: !t.completed } : t
+        )
+      );
+
+      // Use the specific completeTask API endpoint
+      const response = await fetch(`/api/tasks/${taskId}/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ completed: !task.completed }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update task completion status");
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success(
+          `Task ${!task.completed ? "completed" : "reopened"} successfully`
+        );
+      } else {
+        throw new Error(result.error || "Failed to update task");
+      }
     } catch (error) {
+      console.error("Error toggling task completion:", error);
+      // Revert the optimistic update if there was an error
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? tasks.find((original) => original.id === taskId)!
+            : t
+        )
+      );
       toast.error("Failed to update task");
+    } finally {
+      // Clear loading state
+      setCompletionLoading(null);
     }
   };
 
@@ -211,25 +258,8 @@ export function TaskList({
 
   let filteredTasks = tasks || [];
 
-  if (filter) {
-    filteredTasks = filteredTasks.filter((task) => {
-      // Filter by status
-      if (filter === "pending") return !task.completed;
-      if (filter === "completed") return task.completed;
-      if (filter === "overdue")
-        return (
-          !task.completed && task.dueDate && new Date(task.dueDate) < new Date()
-        );
-      if (filter === "date_extension")
-        return !!task.requestedDate && !!task.requestDateExtensionReason;
-      if (filter === "on_hold")
-        return !task.completed && task.status === "on_hold";
-      if (filter === "assigned_by_me") return task.createdUserId === user?.id;
-      if (filter === "assigned_to_me") return task.assignedUserId === user?.id;
-      return true;
-    });
-  }
-
+  // Only keep search, priority and assignee filters client-side
+  // Remove the status filtering since it's now handled server-side
   filteredTasks = filteredTasks.filter((task) => {
     // Filter by search query
     if (!searchQuery) return true;
@@ -290,6 +320,7 @@ export function TaskList({
 
   // Handle page change
   const handlePageChange = (page: number) => {
+    console.log("TaskList: handlePageChange called with page", page);
     onPageChange(page);
   };
 
@@ -509,8 +540,23 @@ export function TaskList({
         </div>
       </div>
 
-      {/* Tasks Table */}
-      {displayedTasks.length === 0 ? (
+      {/* Loading indicator */}
+      {isLoading && displayedTasks.length === 0 && (
+        <div className="w-full flex justify-center items-center p-12 bg-white border border-slate-200 rounded-lg">
+          <div className="flex flex-col items-center">
+            <div className="h-10 w-10 mb-4 animate-spin rounded-full border-4 border-slate-200 border-t-indigo-600"></div>
+            <p className="text-slate-700 text-lg font-medium">
+              Loading tasks...
+            </p>
+            <p className="text-slate-500 text-sm mt-1">
+              Please wait while we fetch your data
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && displayedTasks.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -734,8 +780,17 @@ export function TaskList({
                                   onClick={(e) =>
                                     toggleTaskCompletion(task.id, e)
                                   }
+                                  disabled={completionLoading === task.id}
                                 >
-                                  <CheckCircle className="h-4 w-4" />
+                                  {completionLoading === task.id ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  ) : (
+                                    <CheckCircle
+                                      className={`h-4 w-4 ${
+                                        task.completed ? "text-emerald-500" : ""
+                                      }`}
+                                    />
+                                  )}
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent side="left">
@@ -791,14 +846,13 @@ export function TaskList({
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {totalPages > 1 && displayedTasks.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 gap-4 rounded-b-lg">
               <div className="flex items-center gap-2">
                 <Select
                   value={pageSize.toString()}
                   onValueChange={(value) => {
-                    setPageSize(Number(value));
-                    handlePageChange(1); // Reset to page 1 when changing page size
+                    onPageSizeChange(Number(value));
                   }}
                 >
                   <SelectTrigger className="h-8 w-[70px] bg-white border-slate-200 focus:ring-indigo-500">

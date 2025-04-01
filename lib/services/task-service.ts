@@ -11,7 +11,7 @@ import { deleteTaskDirectory, deleteTaskFile } from './file-service';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { emitNotification } from "@/lib/socket";
+import { emitTaskNotification, broadcastTaskUpdate } from "@/lib/socket-server";
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
@@ -21,6 +21,13 @@ let io: any = null;
 
 export async function setSocketIO(ioInstance: any) {
     io = ioInstance;
+    console.log("Socket.IO instance set in task service:", !!io);
+
+    // Set up event handlers for task events
+    if (io) {
+        console.log("Setting up Socket.IO event handlers for tasks");
+    }
+
     return { success: true };
 }
 
@@ -93,18 +100,56 @@ export async function getStats(userId: number | undefined, type: "created" | "as
     }
 }
 
-export async function getAllTasks(page: number = 1, pageSize: number = 10) {
+export async function getAllTasks(page: number = 1, pageSize: number = 10, filter?: string) {
     try {
         const offset = (page - 1) * pageSize;
+        const today = new Date().toISOString().split('T')[0]; // For date comparisons
+
+        let whereConditions: any[] = [];
+
+        // Apply filters based on the tab
+        if (filter === "pending") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    gte(taskModel.dueDate, today)
+                )
+            );
+        } else if (filter === "completed") {
+            whereConditions.push(eq(taskModel.completed, true));
+        } else if (filter === "overdue") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    lt(taskModel.dueDate, today)
+                )
+            );
+        } else if (filter === "date_extension") {
+            whereConditions.push(
+                and(
+                    sql`${taskModel.requestedDate} IS NOT NULL`,
+                    sql`${taskModel.requestDateExtensionReason} IS NOT NULL`
+                )
+            );
+        } else if (filter === "on_hold") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    eq(taskModel.status, "on_hold")
+                )
+            );
+        }
 
         const [tasks, totalCount] = await Promise.all([
             db
                 .select()
                 .from(taskModel)
+                .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
                 .orderBy(desc(taskModel.createdAt))
                 .limit(pageSize)
                 .offset(offset),
-            db.select({ count: count() }).from(taskModel),
+            db.select({ count: count() }).from(taskModel)
+                .where(whereConditions.length > 0 ? and(...whereConditions) : undefined),
         ]);
 
         const totalPages = Math.ceil(totalCount[0].count / pageSize);
@@ -222,19 +267,17 @@ export async function getCompletedTasks(page: number = 1, size: number = 10, use
             whereConditions.push(eq(taskModel.assignedUserId, userId));
         }
     }
+    whereConditions.push(eq(taskModel.completed, true));
 
     const [tasks, totalTasks] = await Promise.all([
-        db.
-            select()
+        db
+            .select()
             .from(taskModel)
-            .where(and(
-                eq(taskModel.completed, true),
-                ...whereConditions,
-            ))
+            .where(and(...whereConditions))
             .orderBy(desc(taskModel.id))
             .limit(size)
             .offset(offset),
-        db.select({ count: count() }).from(taskModel).where(eq(taskModel.completed, false)),
+        db.select({ count: count() }).from(taskModel).where(and(...whereConditions)),
     ]);
 
     const totalPages = Math.ceil(totalTasks[0].count / size);
@@ -348,15 +391,29 @@ export async function createTask(givenTask: Task, files?: FileList) {
 
         // Emit notification for task creation
         if (io) {
-            emitNotification(io, newTask.assignedUserId!, {
-                type: "task_created",
-                taskId: newTask.id,
-                taskTitle: newTask.description,
-                userId: newTask.createdUserId as number,
-                userName: "System", // You'll need to fetch the actual user name
-                timestamp: new Date(),
-                message: `New task "${newTask.description}" has been assigned to you`,
-            });
+            try {
+                emitTaskNotification(
+                    newTask.assignedUserId!,
+                    {
+                        type: "task_created",
+                        taskId: newTask.id,
+                        taskTitle: newTask.description,
+                        userId: newTask.createdUserId as number,
+                        userName: "System", // You'll need to fetch the actual user name
+                        timestamp: new Date(),
+                        message: `New task "${newTask.description}" has been assigned to you`,
+                    }
+                );
+
+                // Broadcast to all users that a task was created
+                broadcastTaskUpdate(newTask.id, "task_created");
+
+                console.log(`Socket notification sent for task ${newTask.id}`);
+            } catch (error) {
+                console.error("Error sending socket notification:", error);
+            }
+        } else {
+            console.log("Socket.IO not initialized, skipping notification");
         }
 
         return newTask;
@@ -428,15 +485,29 @@ export async function updateTask(id: number, givenTask: Task, files?: FileList) 
 
     // Emit notification for status change
     if (io) {
-        emitNotification(io, updatedTask?.assignedUserId as number, {
-            type: updatedTask?.completed ? "task_completed" : "task_updated",
-            taskId: updatedTask?.id as number,
-            taskTitle: updatedTask?.description,
-            userId: updatedTask?.createdUserId as number,
-            userName: "System", // You'll need to fetch the actual user name
-            timestamp: new Date(),
-            message: `Task "${updatedTask?.description}" has been ${updatedTask?.completed ? "completed" : "updated"}`,
-        });
+        try {
+            emitTaskNotification(
+                updatedTask?.assignedUserId as number,
+                {
+                    type: updatedTask?.completed ? "task_completed" : "task_updated",
+                    taskId: updatedTask?.id as number,
+                    taskTitle: updatedTask?.description,
+                    userId: updatedTask?.createdUserId as number,
+                    userName: "System", // You'll need to fetch the actual user name
+                    timestamp: new Date(),
+                    message: `Task "${updatedTask?.description}" has been ${updatedTask?.completed ? "completed" : "updated"}`,
+                }
+            );
+
+            // Broadcast to all users that a task was updated
+            broadcastTaskUpdate(updatedTask?.id as number, updatedTask?.completed ? "task_completed" : "task_updated");
+
+            console.log(`Socket notification sent for task update ${updatedTask?.id}`);
+        } catch (error) {
+            console.error("Error sending socket notification:", error);
+        }
+    } else {
+        console.log("Socket.IO not initialized, skipping notification");
     }
 
     return updatedTask;
@@ -466,7 +537,7 @@ export async function getAbbreviation(priority: "normal" | "medium" | "high") {
         .limit(1);
 
     // Generate abbreviation
-    const comp1 = priority.charAt(0).toUpperCase();
+    const comp1 = "T";
     const comp2 = currentYear.toString().substring(2); // Only last 2 digits
     const comp3 = currentMonth.toString().padStart(2, '0');
     let comp4 = 1;
@@ -497,6 +568,11 @@ export async function deleteTask(id: number) {
         .delete(taskModel)
         .where(eq(taskModel.id, id))
         .returning();
+
+    // Broadcast task deletion to all users
+    if (deletedTask) {
+        broadcastTaskUpdate(deletedTask.id, "task_deleted");
+    }
 
     return deletedTask;
 }
@@ -570,91 +646,201 @@ export const sendWhatsAppMessage = async (to: string, messageArr: string[] = [],
     }
 }
 
-export async function getTasksAssignedByMe(userId: number, page: number = 1, size: number = 10) {
-    const offset = (page - 1) * size;
+export async function getTasksAssignedByMe(userId: number, page: number = 1, size: number = 10, filter?: string) {
+    try {
+        const offset = (page - 1) * size;
+        const today = new Date().toISOString().split('T')[0]; // For date comparisons
 
-    const [tasks, totalTasks] = await Promise.all([
-        db
-            .select()
-            .from(taskModel)
-            .where(eq(taskModel.createdUserId, userId))
-            .orderBy(desc(taskModel.createdAt))
-            .limit(size)
-            .offset(offset),
-        db
-            .select({ count: count() })
-            .from(taskModel)
-            .where(eq(taskModel.createdUserId, userId)),
-    ]);
+        let whereConditions: any[] = [eq(taskModel.createdUserId, userId)];
 
-    const totalPages = Math.ceil(totalTasks[0].count / size);
+        // Apply filters based on the tab
+        if (filter === "pending") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    gte(taskModel.dueDate, today)
+                )
+            );
+        } else if (filter === "completed") {
+            whereConditions.push(eq(taskModel.completed, true));
+        } else if (filter === "overdue") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    lt(taskModel.dueDate, today)
+                )
+            );
+        } else if (filter === "date_extension") {
+            whereConditions.push(
+                and(
+                    sql`${taskModel.requestedDate} IS NOT NULL`,
+                    sql`${taskModel.requestDateExtensionReason} IS NOT NULL`
+                )
+            );
+        } else if (filter === "on_hold") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    eq(taskModel.status, "on_hold")
+                )
+            );
+        }
 
-    const stats = await getStats(userId, "created");
-    return {
-        tasks,
-        currentPage: page,
-        totalPages,
-        totalTasks: totalTasks[0].count,
-        stats,
-    };
+        const [tasks, totalCount] = await Promise.all([
+            db
+                .select()
+                .from(taskModel)
+                .where(and(...whereConditions))
+                .orderBy(desc(taskModel.createdAt))
+                .limit(size)
+                .offset(offset),
+            db.select({ count: count() }).from(taskModel)
+                .where(and(...whereConditions)),
+        ]);
+
+        const totalPages = Math.ceil(totalCount[0].count / size);
+
+        const stats = await getStats(userId, "created");
+        return {
+            tasks,
+            totalPages,
+            currentPage: page,
+            stats,
+        };
+    } catch (error) {
+        console.error("Error fetching tasks assigned by user:", error);
+        throw error;
+    }
 }
 
-export async function getTasksAssignedToMe(userId: number, page: number = 1, size: number = 10) {
-    const offset = (page - 1) * size;
+export async function getTasksAssignedToMe(userId: number, page: number = 1, size: number = 10, filter?: string) {
+    try {
+        const offset = (page - 1) * size;
+        const today = new Date().toISOString().split('T')[0]; // For date comparisons
 
-    const [tasks, totalTasks] = await Promise.all([
-        db
-            .select()
-            .from(taskModel)
-            .where(eq(taskModel.assignedUserId, userId))
-            .orderBy(desc(taskModel.createdAt))
-            .limit(size)
-            .offset(offset),
-        db
-            .select({ count: count() })
-            .from(taskModel)
-            .where(eq(taskModel.assignedUserId, userId)),
-    ]);
+        let whereConditions: any[] = [eq(taskModel.assignedUserId, userId)];
 
-    const totalPages = Math.ceil(totalTasks[0].count / size);
+        // Apply filters based on the tab
+        if (filter === "pending") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    gte(taskModel.dueDate, today)
+                )
+            );
+        } else if (filter === "completed") {
+            whereConditions.push(eq(taskModel.completed, true));
+        } else if (filter === "overdue") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    lt(taskModel.dueDate, today)
+                )
+            );
+        } else if (filter === "date_extension") {
+            whereConditions.push(
+                and(
+                    sql`${taskModel.requestedDate} IS NOT NULL`,
+                    sql`${taskModel.requestDateExtensionReason} IS NOT NULL`
+                )
+            );
+        } else if (filter === "on_hold") {
+            whereConditions.push(
+                and(
+                    eq(taskModel.completed, false),
+                    eq(taskModel.status, "on_hold")
+                )
+            );
+        }
 
-    const stats = await getStats(userId, "assigned");
-    return {
-        tasks,
-        currentPage: page,
-        totalPages,
-        totalTasks: totalTasks[0].count,
-        stats,
-    };
+        const [tasks, totalCount] = await Promise.all([
+            db
+                .select()
+                .from(taskModel)
+                .where(and(...whereConditions))
+                .orderBy(desc(taskModel.createdAt))
+                .limit(size)
+                .offset(offset),
+            db.select({ count: count() }).from(taskModel)
+                .where(and(...whereConditions)),
+        ]);
+
+        const totalPages = Math.ceil(totalCount[0].count / size);
+
+        const stats = await getStats(userId, "assigned");
+        return {
+            tasks,
+            totalPages,
+            currentPage: page,
+            stats,
+        };
+    } catch (error) {
+        console.error("Error fetching tasks assigned to user:", error);
+        throw error;
+    }
 }
 
 export async function updateTaskStatus(
     taskId: number,
-    status: TaskStatus
-): Promise<Task> {
+    status: string
+): Promise<Task | null> {
     try {
-        const task = await db.task.update({
-            where: { id: taskId },
-            data: { status },
+        const task = await getTaskById(taskId);
+
+        if (!task) {
+            console.error(`Task with ID ${taskId} not found for status update`);
+            return null;
+        }
+
+        const [updatedTask] = await db
+            .update(taskModel)
+            .set({ status })
+            .where(eq(taskModel.id, taskId))
+            .returning();
+
+        if (!updatedTask) {
+            console.error(`Failed to update task ${taskId} status`);
+            return null;
+        }
+
+        console.log(`Task ${taskId} status updated to ${status}`);
+
+        // Create activity log for status change
+        await createActivityLog({
+            actionType: "update",
+            createdAt: new Date(),
+            id: 0,
+            taskId: updatedTask.id,
+            userId: updatedTask.assignedUserId as number
         });
 
         // Emit notification for status change
         if (io) {
-            emitNotification(io, task.assignedUserId, {
-                type: status === "completed" ? "task_completed" : "task_updated",
-                taskId: task.id,
-                taskTitle: task.title,
-                userId: task.createdUserId,
-                userName: "System", // You'll need to fetch the actual user name
-                timestamp: new Date(),
-                message: `Task "${task.title}" has been ${status}`,
-            });
+            try {
+                emitTaskNotification(
+                    updatedTask.assignedUserId as number,
+                    {
+                        type: status === "completed" ? "task_completed" : "task_updated",
+                        taskId: updatedTask.id,
+                        taskTitle: updatedTask.description,
+                        userId: updatedTask.createdUserId as number,
+                        userName: "System",
+                        timestamp: new Date(),
+                        message: `Task "${updatedTask.description}" status has been updated to ${status}`,
+                    }
+                );
+
+                // Broadcast to all users
+                broadcastTaskUpdate(updatedTask.id, "task_updated");
+            } catch (error) {
+                console.error("Error sending status update notification:", error);
+            }
         }
 
-        return task;
+        return updatedTask;
     } catch (error) {
         console.error("Error updating task status:", error);
-        throw error;
+        return null;
     }
 }
 
@@ -662,74 +848,216 @@ export async function requestDateExtension(
     taskId: number,
     requestedDate: Date,
     reason: string
-): Promise<Task> {
+): Promise<Task | null> {
     try {
-        const task = await db.task.update({
-            where: { id: taskId },
-            data: {
+        const task = await getTaskById(taskId);
+
+        if (!task) {
+            console.error(`Task with ID ${taskId} not found for extension request`);
+            return null;
+        }
+
+        const [updatedTask] = await db
+            .update(taskModel)
+            .set({
                 requestedDate,
                 requestDateExtensionReason: reason,
-            },
+            })
+            .where(eq(taskModel.id, taskId))
+            .returning();
+
+        if (!updatedTask) {
+            console.error(`Failed to update task ${taskId} with extension request`);
+            return null;
+        }
+
+        console.log(`Date extension requested for task ${taskId}`);
+
+        // Create activity log for extension request
+        await createActivityLog({
+            actionType: "update",
+            createdAt: new Date(),
+            id: 0,
+            taskId: updatedTask.id,
+            userId: updatedTask.assignedUserId as number
         });
 
         // Emit notification for extension request
         if (io) {
-            emitNotification(io, task.createdUserId, {
-                type: "task_extension_requested",
-                taskId: task.id,
-                taskTitle: task.title,
-                userId: task.assignedUserId,
-                userName: "System", // You'll need to fetch the actual user name
-                timestamp: new Date(),
-                message: `Date extension requested for task "${task.title}"`,
-            });
+            try {
+                emitTaskNotification(
+                    updatedTask.createdUserId as number,
+                    {
+                        type: "task_extension_requested",
+                        taskId: updatedTask.id,
+                        taskTitle: updatedTask.description,
+                        userId: updatedTask.assignedUserId as number,
+                        userName: "System",
+                        timestamp: new Date(),
+                        message: `Date extension requested for task "${updatedTask.description}"`,
+                    }
+                );
+
+                // Broadcast to all users
+                broadcastTaskUpdate(updatedTask.id, "task_updated");
+            } catch (error) {
+                console.error("Error sending extension request notification:", error);
+            }
         }
 
-        return task;
+        return updatedTask;
     } catch (error) {
         console.error("Error requesting date extension:", error);
-        throw error;
+        return null;
     }
 }
 
 export async function handleDateExtensionRequest(
     taskId: number,
     approved: boolean
-): Promise<Task> {
+): Promise<Task | null> {
     try {
-        const task = await db.task.update({
-            where: { id: taskId },
-            data: {
-                ...(approved
-                    ? {
-                        dueDate: task.requestedDate,
-                        requestedDate: null,
-                        requestDateExtensionReason: null,
-                    }
-                    : {
-                        requestedDate: null,
-                        requestDateExtensionReason: null,
-                    }),
-            },
+        const task = await getTaskById(taskId);
+
+        if (!task) {
+            console.error(`Task with ID ${taskId} not found for handling extension request`);
+            return null;
+        }
+
+        const updateData = approved
+            ? {
+                dueDate: task.requestedDate,
+                requestedDate: null,
+                requestDateExtensionReason: null,
+            }
+            : {
+                requestedDate: null,
+                requestDateExtensionReason: null,
+            };
+
+        const [updatedTask] = await db
+            .update(taskModel)
+            .set(updateData)
+            .where(eq(taskModel.id, taskId))
+            .returning();
+
+        if (!updatedTask) {
+            console.error(`Failed to update task ${taskId} extension request`);
+            return null;
+        }
+
+        console.log(`Date extension request for task ${taskId} ${approved ? 'approved' : 'rejected'}`);
+
+        // Create activity log for extension request response
+        await createActivityLog({
+            actionType: "update",
+            createdAt: new Date(),
+            id: 0,
+            taskId: updatedTask.id,
+            userId: updatedTask.createdUserId as number
         });
 
         // Emit notification for extension request response
         if (io) {
-            emitNotification(io, task.assignedUserId, {
-                type: approved ? "task_extension_approved" : "task_extension_rejected",
-                taskId: task.id,
-                taskTitle: task.title,
-                userId: task.createdUserId,
-                userName: "System", // You'll need to fetch the actual user name
-                timestamp: new Date(),
-                message: `Date extension request for task "${task.title}" has been ${approved ? "approved" : "rejected"
-                    }`,
-            });
+            try {
+                emitTaskNotification(
+                    updatedTask.assignedUserId as number,
+                    {
+                        type: approved ? "task_extension_approved" : "task_extension_rejected",
+                        taskId: updatedTask.id,
+                        taskTitle: updatedTask.description,
+                        userId: updatedTask.createdUserId as number,
+                        userName: "System",
+                        timestamp: new Date(),
+                        message: `Date extension request for task "${updatedTask.description}" has been ${approved ? "approved" : "rejected"}`,
+                    }
+                );
+
+                // Broadcast to all users
+                broadcastTaskUpdate(updatedTask.id, "task_updated");
+            } catch (error) {
+                console.error("Error sending extension response notification:", error);
+            }
         }
 
-        return task;
+        return updatedTask;
     } catch (error) {
         console.error("Error handling date extension request:", error);
-        throw error;
+        return null;
+    }
+}
+
+export async function completeTask(taskId: number, completed: boolean = true) {
+    try {
+        const task = await getTaskById(taskId);
+
+        if (!task) {
+            console.error(`Task with ID ${taskId} not found for completion`);
+            return null;
+        }
+
+        // Update the task
+        const [updatedTask] = await db
+            .update(taskModel)
+            .set({ completed })
+            .where(eq(taskModel.id, taskId))
+            .returning();
+
+        console.log(`Task ${taskId} ${completed ? 'completed' : 'reopened'}`);
+
+        await createActivityLog({
+            actionType: completed ? "completed" : "update",
+            createdAt: new Date(),
+            id: 0,
+            taskId: updatedTask.id,
+            userId: updatedTask.assignedUserId as number
+        });
+
+        // Always emit specific task_completed/task_reopened event for this action
+        if (io) {
+            try {
+                // Emit to specific user
+                emitTaskNotification(
+                    updatedTask.assignedUserId as number,
+                    {
+                        type: completed ? "task_completed" : "task_reopened",
+                        taskId: updatedTask.id,
+                        taskTitle: updatedTask.description,
+                        userId: updatedTask.createdUserId as number,
+                        userName: "System",
+                        timestamp: new Date(),
+                        message: `Task "${updatedTask.description}" has been ${completed ? "completed" : "reopened"}`,
+                    }
+                );
+
+                // Also notify the task creator
+                if (updatedTask.createdUserId !== updatedTask.assignedUserId) {
+                    emitTaskNotification(
+                        updatedTask.createdUserId as number,
+                        {
+                            type: completed ? "task_completed" : "task_reopened",
+                            taskId: updatedTask.id,
+                            taskTitle: updatedTask.description,
+                            userId: updatedTask.assignedUserId as number,
+                            userName: "System",
+                            timestamp: new Date(),
+                            message: `Task "${updatedTask.description}" has been ${completed ? "completed" : "reopened"} by the assignee`,
+                        }
+                    );
+                }
+
+                // Broadcast to all users
+                broadcastTaskUpdate(updatedTask.id, completed ? "task_completed" : "task_reopened");
+
+                console.log(`Completion notification sent for task ${updatedTask.id}`);
+            } catch (error) {
+                console.error("Error sending completion notification:", error);
+            }
+        }
+
+        return updatedTask;
+    } catch (error) {
+        console.error("Error completing task:", error);
+        return null;
     }
 }

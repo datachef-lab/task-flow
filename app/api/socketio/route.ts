@@ -1,41 +1,40 @@
 import { NextResponse } from "next/server";
-import { Server as NetServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
-import { NextApiResponseServerIO } from "@/lib/socket";
+import { createSocketIOServer, getSocketIO } from "@/lib/socket-server";
 import { setSocketIO } from "@/lib/services/task-service";
 
 export async function GET(req: Request) {
-    if (!(req as any).socket.server.io) {
-        console.log("Initializing Socket.IO server...");
-        const io = new SocketIOServer((req as any).socket.server, {
-            path: "/api/socketio",
-            addTrailingSlash: false,
-            cors: {
-                origin: "*",
-                methods: ["GET", "POST"],
-            },
-        });
+    try {
+        // Get or create the Socket.IO server
+        const io = getSocketIO() || createSocketIOServer();
 
-        // Set the io instance in the task service
-        await setSocketIO(io);
+        // Set the IO instance in the task service
+        try {
+            await setSocketIO(io);
+        } catch (error) {
+            console.error("Error setting Socket.IO in task service:", error);
+        }
 
-        io.on("connection", (socket) => {
-            console.log("Client connected:", socket.id);
-
-            // Join user's personal room
-            socket.on("join", (userId: string) => {
-                socket.join(`user:${userId}`);
-                console.log(`User ${userId} joined their room`);
-            });
-
-            // Handle disconnection
-            socket.on("disconnect", () => {
-                console.log("Client disconnected:", socket.id);
-            });
-        });
-
-        (req as any).socket.server.io = io;
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("Error initializing Socket.IO:", error);
+        return NextResponse.json(
+            { success: false, error: "Failed to initialize Socket.IO" },
+            { status: 500 }
+        );
     }
+}
 
-    return NextResponse.json({ success: true });
+export async function POST(req: Request) {
+    return GET(req);
+}
+
+export async function OPTIONS(req: Request) {
+    return new NextResponse(null, {
+        status: 200,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+    });
 } 
