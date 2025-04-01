@@ -118,11 +118,11 @@ export function DashboardContent({ users, onSubmit }: DashboardContentProps) {
         let response: ResponseData | undefined;
 
         // Add the active tab as a filter parameter in API calls
-        if (topLevelTab === "Assign By Me" && user?.id) {
+        if (topLevelTab === topLevelTabArr[0] && user?.id) {
           response = await getTasksAssignedByMe(user.id, page, size, activeTab);
-        } else if (topLevelTab === "Assign To Me" && user?.id) {
+        } else if (topLevelTab === topLevelTabArr[1] && user?.id) {
           response = await getTasksAssignedToMe(user.id, page, size, activeTab);
-        } else {
+        } else if (topLevelTab === topLevelTabArr[2] && user?.isAdmin) {
           response = await getAllTasks(page, size, activeTab);
         }
 
@@ -394,6 +394,14 @@ export function DashboardContent({ users, onSubmit }: DashboardContentProps) {
     return () => clearInterval(intervalId);
   }, [fetchTasksWithTimestamp, currentPage, pageSize]);
 
+  // Filter tabs based on admin status
+  const visibleTabs = topLevelTabArr.filter((tab) => {
+    if (tab === "Assign By Everyone") {
+      return user?.isAdmin;
+    }
+    return true;
+  });
+
   return (
     <main className="container flex flex-1 flex-col gap-8 p-4 md:gap-10 md:p-6">
       <motion.div
@@ -419,7 +427,7 @@ export function DashboardContent({ users, onSubmit }: DashboardContentProps) {
         className="w-full"
       >
         <ul className="flex border-b pb-5">
-          {topLevelTabArr.map((tab) => (
+          {visibleTabs.map((tab) => (
             <li
               key={tab}
               onClick={() => setTopLevelTab(tab)}
