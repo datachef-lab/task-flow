@@ -49,6 +49,8 @@
     "@radix-ui/react-toggle": "^1.1.1",
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@react-email/components": "^0.0.34",
+    "@react-email/render": "^1.0.5",
     "@reduxjs/toolkit": "^2.6.1",
     "@tidbcloud/serverless": "latest",
     "@types/bcrypt": "^5.0.2",

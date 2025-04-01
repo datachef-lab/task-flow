@@ -12,6 +12,8 @@ import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { emitTaskNotification, broadcastTaskUpdate } from "@/lib/socket-server";
+import { render } from '@react-email/render';
+import { TaskCreatedEmail } from '../email-templates/task-created';
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
@@ -371,23 +373,54 @@ export async function createTask(givenTask: Task, files?: FileList) {
             userId: newTask.assignedUserId
         });
 
-        // Send the email
+        // Get user details for email
         const createdUser = await getUserById(newTask.createdUserId as number);
         const assignedUser = await getUserById(newTask.assignedUserId as number);
 
-        await sendEmail(
-            assignedUser?.email as string,
-            'Task Assignment',
-            `Task "${newTask.abbreviation}" has been assigned to you.`
+        // Generate task link
+        const taskLink = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tasks/${newTask.id}`;
+
+        // Generate HTML email content
+        const emailHtml = render(
+            TaskCreatedEmail({
+                taskTitle: newTask.description,
+                taskDescription: newTask.description,
+                dueDate: new Date(newTask.dueDate).toLocaleDateString(),
+                priority: newTask.priorityType,
+                createdBy: createdUser?.name || 'Unknown User',
+                taskLink,
+            })
         );
 
+        // Send the email with HTML content
+        if (assignedUser?.email) {
+            try {
+                await sendEmail(
+                    assignedUser.email,
+                    'New Task Assigned - Task Flow',
+                    `New task "${newTask.description}" has been assigned to you.`,
+                    emailHtml
+                );
+            } catch (emailError) {
+                console.error('Error sending email:', emailError);
+                // Don't throw the error, just log it
+            }
+        }
+
         // TODO: Send the WhatsApp
-        await sendWhatsAppMessage(assignedUser?.whatsappNumber as string, [
-            assignedUser?.name as string,
-            newTask.abbreviation || "default_user",
-            createdUser?.name as string,
-            newTask.dueDate?.toString() || 'default_date',
-        ], "task_assigned");
+        if (assignedUser?.whatsappNumber) {
+            try {
+                await sendWhatsAppMessage(assignedUser.whatsappNumber, [
+                    assignedUser.name as string,
+                    newTask.abbreviation || "default_user",
+                    createdUser?.name as string,
+                    newTask.dueDate?.toString() || 'default_date',
+                ], "task_assigned");
+            } catch (whatsappError) {
+                console.error('Error sending WhatsApp message:', whatsappError);
+                // Don't throw the error, just log it
+            }
+        }
 
         // Emit notification for task creation
         if (io) {
@@ -399,7 +432,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
                         taskId: newTask.id,
                         taskTitle: newTask.description,
                         userId: newTask.createdUserId as number,
-                        userName: "System", // You'll need to fetch the actual user name
+                        userName: createdUser?.name || "System",
                         timestamp: new Date(),
                         message: `New task "${newTask.description}" has been assigned to you`,
                     }
@@ -411,6 +444,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
                 console.log(`Socket notification sent for task ${newTask.id}`);
             } catch (error) {
                 console.error("Error sending socket notification:", error);
+                // Don't throw the error, just log it
             }
         } else {
             console.log("Socket.IO not initialized, skipping notification");
@@ -419,9 +453,8 @@ export async function createTask(givenTask: Task, files?: FileList) {
         return newTask;
     } catch (error) {
         console.error("Error creating task:", error);
+        return null;
     }
-
-    return null;
 }
 
 export async function updateTask(id: number, givenTask: Task, files?: FileList) {

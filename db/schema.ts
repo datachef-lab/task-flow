@@ -24,6 +24,8 @@ export const userModel = pgTable("users", {
     disabled: boolean().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().$onUpdateFn(() => new Date()),
+    resetToken: text("reset_token"),
+    resetTokenExpiry: timestamp("reset_token_expiry"),
 })
 
 // export const departments = pgTable("user_departments", {

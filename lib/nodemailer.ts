@@ -2,25 +2,35 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: ".env.local" });
+
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER, // Your Gmail
-        pass: process.env.EMAIL_PASS, // Your App Password
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS, // This should be your Gmail App Password
     },
 });
 
-export async function sendEmail(to: string, subject: string, text: string) {
-    console.log(process.env.EMAIL_USER, process.env.EMAIL_PASS)
+export async function sendEmail(
+    to: string,
+    subject: string,
+    text: string,
+    html?: string
+) {
     try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER,
+        const mailOptions = {
+            from: `"Task Flow" <${process.env.EMAIL_USER}>`,
             to,
             subject,
             text,
-        });
-        console.log('Email sent successfully');
+            html,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent:', info.messageId);
+        return info;
     } catch (error) {
         console.error('Error sending email:', error);
+        throw error;
     }
 }

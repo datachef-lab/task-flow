@@ -1,1 +1,0 @@
-ALTER TABLE "cronjobs" ALTER COLUMN "creation_time" SET DATA TYPE time with time zone;

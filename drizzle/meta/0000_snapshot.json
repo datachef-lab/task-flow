@@ -1,5 +1,5 @@
 {
-  "id": "1e20f80f-eab1-4bfa-95e9-1377681936ba",
+  "id": "a40578f9-41dc-4524-9a02-9f48f69a0b9e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -35,9 +35,9 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "now()"
         }
       },
@@ -94,7 +94,7 @@
         },
         "creation_time": {
           "name": "creation_time",
-          "type": "timestamp",
+          "type": "time with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
@@ -122,14 +122,14 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
@@ -195,8 +195,8 @@
           "name": "due_date",
           "type": "date",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'2025-03-22'"
+          "notNull": false,
+          "default": "now()"
         },
         "priority_type": {
           "name": "priority_type",
@@ -213,16 +213,60 @@
           "notNull": true,
           "default": false
         },
+        "on_hold_reason": {
+          "name": "on_hold_reason",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "task_status_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_date": {
+          "name": "requested_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_date_extension_reason": {
+          "name": "request_date_extension_reason",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_request_date_extension_approved": {
+          "name": "is_request_date_extension_approved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "files": {
+          "name": "files",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::json"
+        },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
@@ -306,6 +350,18 @@
           "notNull": false,
           "default": false
         },
+        "password": {
+          "name": "password",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "picture": {
+          "name": "picture",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "disabled": {
           "name": "disabled",
           "type": "boolean",
@@ -315,17 +371,29 @@
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "timestamp",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
+        },
+        "reset_token": {
+          "name": "reset_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset_token_expiry": {
+          "name": "reset_token_expiry",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -375,6 +443,15 @@
         "normal",
         "medium",
         "high"
+      ]
+    },
+    "public.task_status_type": {
+      "name": "task_status_type",
+      "schema": "public",
+      "values": [
+        "completed",
+        "on_hold",
+        "request_date_extension"
       ]
     }
   },
