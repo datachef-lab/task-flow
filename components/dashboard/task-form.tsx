@@ -22,6 +22,7 @@ type TaskFormProps = {
   task?: Task;
   type?: "add" | "edit";
   onSubmit: (formData: Partial<Task>, files?: FileList) => Promise<void>;
+  setOpen: (open: boolean) => void;
 };
 
 type TaskFile = {
@@ -30,7 +31,7 @@ type TaskFile = {
   type: string;
 };
 
-export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
+export function TaskForm({ task, type, onSubmit, setOpen }: TaskFormProps) {
   const router = useRouter();
   const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState<boolean>(false);
@@ -298,7 +299,10 @@ export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.back()}
+          onClick={() => {
+            // Close the modal instead of navigating back
+            setOpen(false);
+          }}
           disabled={loading}
           className="bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
         >
@@ -312,8 +316,8 @@ export function TaskForm({ task, type, onSubmit }: TaskFormProps) {
           {loading
             ? "Submitting..."
             : type === "add"
-            ? "Create Task"
-            : "Update Task"}
+              ? "Create Task"
+              : "Update Task"}
         </Button>
       </div>
     </form>
