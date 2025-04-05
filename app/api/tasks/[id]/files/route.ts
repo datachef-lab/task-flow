@@ -38,7 +38,7 @@ export async function POST(
         console.log(`Received ${files.length} files for upload`);
 
         // Ensure task directory exists
-        const uploadDir = join(DOCUMENT_PATH!, "documents", taskId.toString());
+        const uploadDir = join(DOCUMENT_PATH!, taskId.toString());
         if (!existsSync(uploadDir)) {
             await mkdir(uploadDir, { recursive: true });
             console.log(`Created directory: ${uploadDir}`);
@@ -142,7 +142,7 @@ export async function DELETE(
         }
 
         // Delete the file from disk
-        const filePath = join(DOCUMENT_PATH!, 'documents', taskId.toString(), fileName);
+        const filePath = join(DOCUMENT_PATH!, taskId.toString(), fileName);
         if (existsSync(filePath)) {
             await unlink(filePath);
         }

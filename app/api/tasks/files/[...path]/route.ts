@@ -25,7 +25,7 @@ export async function GET(
         console.log("Joined path:", fullPath);
 
         // Full path on server
-        const filePath = join(process.cwd(), "documents", fullPath);
+        const filePath = join(process.env.DOCUMENT_PATH!, fullPath);
         console.log("Absolute file path:", filePath);
 
         // Check if file exists

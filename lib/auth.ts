@@ -108,7 +108,7 @@ export function setAuthCookies(tokens: AuthTokens) {
         name: 'refreshToken',
         value: tokens.refreshToken,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false,
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
         path: '/',

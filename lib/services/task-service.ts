@@ -309,7 +309,7 @@ export async function getTaskById(id: number) {
 }
 
 async function handleTaskFiles(taskId: number, files: File[]): Promise<Array<{ name: string; path: string; type: string; size: number }>> {
-    const uploadDir = join(DOCUMENT_PATH!, 'documents', taskId.toString());
+    const uploadDir = join(DOCUMENT_PATH!, taskId.toString());
 
     // Create task directory if it doesn't exist
     if (!existsSync(uploadDir)) {
