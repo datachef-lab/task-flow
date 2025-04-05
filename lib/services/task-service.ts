@@ -379,7 +379,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
         const assignedUser = await getUserById(newTask.assignedUserId as number);
 
         // Generate task link
-        const taskLink = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tasks/${newTask.id}`;
+        const taskLink = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/${newTask.id}`;
 
         // Generate HTML email content
         const emailHtml = await render(
