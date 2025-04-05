@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm';
 import { activityLogModel, Task, taskModel } from "@/db/schema";
 import { createActivityLog } from "./activity-service";
 import { getUserById } from "./user-service";
-import { sendEmail } from "../nodemailer";
+
 import { deleteTaskDirectory, deleteTaskFile } from './file-service';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
@@ -14,6 +14,7 @@ import { existsSync } from 'fs';
 import { emitTaskNotification, broadcastTaskUpdate } from "@/lib/socket-server";
 import { render } from '@react-email/render';
 import { TaskCreatedEmail } from '../email-templates/task-created';
+import { sendZeptoMail } from "../zepto-mailer";
 
 const INTERAKT_API_KEY = process.env.INTERAKT_API_KEY;
 const INTERAKT_BASE_URL = process.env.INTERAKT_BASE_URL;
@@ -381,7 +382,7 @@ export async function createTask(givenTask: Task, files?: FileList) {
         const taskLink = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tasks/${newTask.id}`;
 
         // Generate HTML email content
-        const emailHtml = render(
+        const emailHtml = await render(
             TaskCreatedEmail({
                 taskTitle: newTask.description,
                 taskDescription: newTask.description,
@@ -393,34 +394,40 @@ export async function createTask(givenTask: Task, files?: FileList) {
         );
 
         // Send the email with HTML content
-        if (assignedUser?.email) {
-            try {
-                await sendEmail(
-                    assignedUser.email,
-                    'New Task Assigned - Task Flow',
-                    `New task "${newTask.description}" has been assigned to you.`,
-                    emailHtml
-                );
-            } catch (emailError) {
-                console.error('Error sending email:', emailError);
-                // Don't throw the error, just log it
-            }
+        // if (assignedUser?.email) {
+        try {
+            await sendZeptoMail(
+                assignedUser.email,
+                'New Task Assigned - Task Flow',
+                emailHtml,
+                assignedUser.name
+            )
+            // await sendEmail(
+            //     assignedUser.email,
+            //     'New Task Assigned - Task Flow',
+            //     `New task "${newTask.description}" has been assigned to you.`,
+            //     emailHtml
+            // );
+        } catch (emailError) {
+            console.error('Error sending email:', emailError);
+            // Don't throw the error, just log it
         }
+        // }
 
         // TODO: Send the WhatsApp
-        if (assignedUser?.whatsappNumber) {
-            try {
-                await sendWhatsAppMessage(assignedUser.whatsappNumber, [
-                    assignedUser.name as string,
-                    newTask.abbreviation || "default_user",
-                    createdUser?.name as string,
-                    newTask.dueDate?.toString() || 'default_date',
-                ], "task_assigned");
-            } catch (whatsappError) {
-                console.error('Error sending WhatsApp message:', whatsappError);
-                // Don't throw the error, just log it
-            }
+        // if (assignedUser?.whatsappNumber) {
+        try {
+            await sendWhatsAppMessage(assignedUser.whatsappNumber, [
+                assignedUser.name as string,
+                newTask.abbreviation || "default_user",
+                createdUser?.name as string,
+                newTask.dueDate?.toString() || 'default_date',
+            ], "task_assigned");
+        } catch (whatsappError) {
+            console.error('Error sending WhatsApp message:', whatsappError);
+            // Don't throw the error, just log it
         }
+        // }
 
         // Emit notification for task creation
         if (io) {
