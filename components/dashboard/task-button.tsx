@@ -66,7 +66,12 @@ export default function TaskButton({ type, task, onSubmit }: TaskButtonProps) {
             {type === "add" ? "Add New Task" : "Edit Task"}
           </DialogTitle>
         </DialogHeader>
-        <TaskForm task={task} type={type} onSubmit={handleSubmit} />
+        <TaskForm
+          task={task}
+          type={type}
+          onSubmit={handleSubmit}
+          setOpen={setOpen}
+        />
       </DialogContent>
     </Dialog>
   );
